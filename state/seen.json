@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "last_updated": "2026-07-01",
+  "articles": {
+    "https://openai.com/index/introducing-genebench-pro": "2026-07-01",
+    "https://www.anthropic.com/research/measuring-agent-autonomy": "2026-07-01",
+    "https://www.anthropic.com/research/petri-open-source-auditing": "2026-07-01",
+    "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents": "2026-07-01"
+  },
+  "evergreen_push_counts": {
+    "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents": 1
+  },
+  "feedback": {
+    "thumbs_up": [],
+    "thumbs_down": []
+  },
+  "weights": {}
+}

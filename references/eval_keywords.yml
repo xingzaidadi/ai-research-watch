@@ -1,0 +1,49 @@
+# 评估/测评相关关键词及权重
+# 匹配到的文章额外加分
+
+keywords:
+  # 核心评估词（+3 分）
+  high:
+    - eval
+    - evaluation
+    - benchmark
+    - system card
+    - safety report
+    - capability assessment
+    - model evaluation
+
+  # Agent/推理相关（+2 分）
+  medium:
+    - agent
+    - reasoning
+    - alignment
+    - safety
+    - chain of thought
+    - tool use
+    - function calling
+    - multi-agent
+    - planning
+    - reflection
+
+  # 技术细分（+1 分）
+  low:
+    - SWE-bench
+    - HumanEval
+    - MMLU
+    - MATH
+    - GSM8K
+    - AgentBench
+    - WebArena
+    - τ-bench
+    - pass@k
+    - red teaming
+    - adversarial
+    - robustness
+    - hallucination
+    - grounding
+
+# 评分映射
+score_map:
+  high: 3
+  medium: 2
+  low: 1

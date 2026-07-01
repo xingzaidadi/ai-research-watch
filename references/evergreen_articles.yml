@@ -1,0 +1,83 @@
+# Evergreen 补课文章池
+# 当天无新内容时，从这里选文章推送
+
+evergreen:
+  - title: "Demystifying evals for AI agents"
+    source: Anthropic
+    url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents"
+    category: eval
+    tags: [eval, benchmark, agent, grading]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Building effective agents"
+    source: Anthropic
+    url: "https://www.anthropic.com/engineering/building-effective-agents"
+    category: agent
+    tags: [agent, workflow, orchestration]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "A practical guide to building agents"
+    source: OpenAI
+    url: "https://openai.com/index/a-practical-guide-to-building-agents/"
+    category: agent
+    tags: [agent, orchestration, handoff]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "LLM Powered Autonomous Agents"
+    source: Lilian Weng (OpenAI)
+    url: "https://lilianweng.github.io/posts/2023-06-23-agent/"
+    category: foundational
+    tags: [agent, memory, planning, tools]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Harness engineering: leveraging Codex in an agent-first world"
+    source: OpenAI
+    url: "https://openai.com/index/harness-engineering/"
+    category: eval
+    tags: [eval, codex, harness, engineering]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Establishing Best Practices for Building Rigorous Agentic Benchmarks"
+    source: arXiv
+    url: "https://arxiv.org/abs/2505.00149"
+    category: benchmark
+    tags: [benchmark, evaluation, methodology]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Log analysis is necessary for credible evaluation of AI agents"
+    source: arXiv
+    url: "https://arxiv.org/abs/2505.00150"
+    category: eval
+    tags: [eval, logging, credibility, transcript]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "The 2025 AI Agent Index"
+    source: arXiv
+    url: "https://arxiv.org/abs/2602.16151"
+    category: survey
+    tags: [agent, survey, landscape]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Improving Deep Agents with Harness Engineering"
+    source: LangChain
+    url: "https://blog.langchain.dev/improving-deep-agents-with-harness-engineering/"
+    category: agent
+    tags: [agent, harness, self-improvement, langchain]
+    max_pushes: 2
+    push_count: 0
+
+  - title: "Practices for governing agentic AI systems"
+    source: OpenAI
+    url: "https://openai.com/index/practices-for-governing-agentic-ai-systems/"
+    category: governance
+    tags: [governance, safety, alignment, policy]
+    max_pushes: 2
+    push_count: 0
