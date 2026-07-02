@@ -129,3 +129,77 @@ flowchart TD
 - 从 `references/evergreen_articles.yml` 中选取
 - 优先选未推送过的
 - 每篇最多推送 2 次后移出候选池
+
+---
+
+## 论文全文抓取（深度阅读模式）
+
+### 触发条件
+- 用户说"下载论文全文""获取论文原文""抓取论文""download paper" "fetch paper"
+- 用户给出 arXiv 链接/ID 要求获取内容
+- 用户说"把这篇论文搞下来""原文在哪"
+
+### 抓取策略（三路 fallback，确保成功）
+
+| 优先级 | 策略 | 优点 | 缺点 |
+|--------|------|------|------|
+| 1️⃣ | arXiv HTML | 速度快、可读文本 | 非所有论文都有 |
+| 2️⃣ | arXiv LaTeX 源码 | 含公式/代码/完整内容 | 需解压解析 |
+| 3️⃣ | arXiv PDF | 总是可用 | 文本提取困难 |
+
+**关键设计**：串行尝试，每步成功都继续尝试后续策略作为备份，最终选最佳格式。
+
+### 工作流程
+
+```mermaid
+flowchart TD
+    A[用户请求] --> B[extract_arxiv_id]
+    B --> C[获取元数据 title/authors/abstract]
+    C --> D[策略1: arXiv HTML]
+    D -->|成功| E[保存文本]
+    D -->|失败| F[策略2: LaTeX 源码]
+    E --> F
+    F -->|成功| G[解压+提取文本]
+    F -->|失败| H[策略3: PDF]
+    G --> H
+    H --> I[保存所有格式到本地]
+    I --> J[创建飞书文档到指定文件夹]
+    J --> K[生成阅读摘要]
+```
+
+### 保存为飞书文档
+
+抓取完成后，将论文内容保存为飞书文档：
+- **目标文件夹**：`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`（用户指定的论文库）
+- **文档命名**：`{日期}_{论文标题}.md`
+- **文档内容**：元数据 + 摘要 + 全文文本（LaTeX 提取或 HTML 文本）
+- **使用工具**：`feishu_lark_cli` → `docs +create --api-version v2 --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
+
+### 执行步骤
+
+1. **解析 ID**：从用户输入提取 arXiv ID（支持 URL 和纯 ID）
+2. **获取元数据**：`web_access_tool fetch https://arxiv.org/abs/{ID}` 提取标题/作者/摘要
+3. **三路 fallback 下载**（用 exec curl）：
+   - `curl -L https://arxiv.org/html/{ID}v1` → HTML 文本
+   - `curl -L https://arxiv.org/e-print/{ID}` → LaTeX 源码 tar.gz → 解压提取 .tex
+   - `curl -L https://arxiv.org/pdf/{ID}` → PDF 备份
+4. **提取全文文本**：LaTeX 源码去除命令保留内容；HTML 直接用 readability 文本
+5. **保存飞书文档**：用 `feishu_lark_cli docs +create` 创建到指定文件夹
+6. **推送通知**：告知用户文档已创建，附飞书链接
+
+### 脚本
+
+| 脚本 | 作用 |
+|------|------|
+| `scripts/fetch_paper.py` | arXiv 论文下载（三路 fallback） |
+| `scripts/render_paper_doc.py` | 生成飞书文档内容（Markdown 格式） |
+
+### 输出文件（本地临时）
+
+| 文件 | 内容 |
+|------|------|
+| `{ID}.html.txt` | HTML 全文文本 |
+| `{ID}-source.tar.gz` | LaTeX 源码压缩包 |
+| `{ID}-src/*.tex` | 解压后的 .tex 文件 |
+| `{ID}.latex.txt` | 提取的 LaTeX 纯文本 |
+| `{ID}.pdf` | PDF 原文件 |

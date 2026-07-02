@@ -1,0 +1,12 @@
+# 状态文件（运行时生成，不提交）
+state/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 临时文件
+*.tmp
+*.bak
+.DS_Store
