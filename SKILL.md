@@ -135,8 +135,9 @@ flowchart TD
 ## 论文全文抓取（深度阅读模式）
 
 ### 触发条件
-- 用户说"下载论文全文""获取论文原文""抓取论文""download paper" "fetch paper"
+- 用户说"下载论文全文""获取论文原文""抓取论文""download paper" "fetch paper" "下载这篇文章" "把这篇搞下来"
 - 用户给出 arXiv 链接/ID 要求获取内容
+- 用户给出任意文章链接（博客/arXiv/新闻）要求下载
 - 用户说"把这篇论文搞下来""原文在哪"
 
 ### 抓取策略（三路 fallback，确保成功）
@@ -167,13 +168,94 @@ flowchart TD
     J --> K[生成阅读摘要]
 ```
 
-### 保存为飞书文档
+### 保存为飞书文档（强制规则）
 
-抓取完成后，将论文内容保存为飞书文档：
-- **目标文件夹**：`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`（用户指定的论文库）
-- **文档命名**：`{日期}_{论文标题}.md`
-- **文档内容**：元数据 + 摘要 + 全文文本（LaTeX 提取或 HTML 文本）
-- **使用工具**：`feishu_lark_cli` → `docs +create --api-version v2 --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
+抓取完成后，将论文内容保存为飞书文档，**必须遵守以下三条铁律**：
+
+#### 铁律一：按 writing-guidelines.md 拆解
+
+所有下载的文章必须按 `memory/writing-guidelines.md` 的章节模板拆解，不能只是搬运原文。
+
+每个章节必须包含：
+- `> 📌 一句话锚定`（blockquote）
+- `## 🔍 为什么需要它？`（场景故事切入）
+- `## 🧩 核心拆解`（文字拆解 + 对比表格 + 橙色 callout）
+- `## ⚠️ 边学边踩坑`（问题→后果→方案表格）
+- `## 🔗 关联章节`（前置预告 + 回溯引用）
+- `## 📌 本章最该记住的一句话`
+- `## 💬 面试准备`（蓝色 callout Q&A）
+
+Callout 颜色语义（必须一致）：
+- 🟠 橙色：核心定义、一句话理解
+- 🔵 蓝色：面试话术
+- 🔴 红色：踩坑、风险警告
+- 🟡 黄色：关联章节
+- 🟢 绿色：最佳实践
+
+#### 铁律二：文档所有权授予用户
+
+所有用 `feishu_lark_cli docs +create` 创建的文档，**必须确保用户拥有 full_access 权限**。
+- 创建时使用 `--as bot`，CLI 会自动尝试授权
+- 如果自动授权失败，手动调用 `feishu_lark_cli drive +permission` 授权
+- 用户 open_id：`ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef`
+
+#### 铁律三：保存到指定文件夹
+
+所有文档必须保存到用户指定的论文库文件夹：
+- **目标文件夹 token**：`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
+- **创建命令**：`feishu_lark_cli docs +create --api-version v2 --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe --content '<title>...'`
+- 创建后自动获得 full_access 权限（bot 创建时自动授权）
+
+#### 文档命名
+- **arXiv 论文**：`{日期}_{论文标题}`
+- **博客文章**：`{日期}_{来源}_{文章标题}`
+
+#### 文档内容结构模板
+```xml
+<title>{日期}_{标题}</title>
+<callout emoji="💡" background-color="orange"><b>一句话理解</b>：{核心结论}</callout>
+<p><i>来源：{来源链接} | 作者：{作者}</i></p>
+<hr/>
+# 第一章、{章节标题}
+> 📌 {一句话锚定}
+## 🔍 为什么需要它？
+{场景故事}
+## 🧩 核心拆解
+{文字+表格+callout}
+## ⚠️ 边学边踩坑
+{踩坑表格}
+## 🔗 关联章节
+{双向织网表}
+## 📌 本章最该记住的一句话
+> {一句话}
+## 💬 面试准备
+<callout emoji="💬" background-color="blue">{Q&A}</callout>
+<hr/>
+{...后续章节...}
+
+## 📎 下载链接
+{根据文章类型选择对应格式}
+```
+
+#### 下载链接格式（按文章类型区分）
+
+**arXiv 论文：**
+```xml
+<h1>📎 下载链接</h1>
+<p>📄 <a href="https://arxiv.org/pdf/{ID}">PDF 全文</a> | 📋 <a href="https://arxiv.org/abs/{ID}">arXiv 页面</a> | 💻 <a href="{github_url}">GitHub 代码</a></p>
+```
+- 三个入口都有就全放，缺哪个就不放哪个，别凑数
+
+**博客文章（Anthropic/OpenAI/Google 等）：**
+```xml
+<h1>📎 原文链接</h1>
+<p>📄 <a href="{original_url}">原文</a> | 💻 <a href="{related_github}">相关代码/ Cookbook</a></p>
+```
+- 原文必放，相关代码/ Cookbook 有就放，没有就不放
+
+**判断逻辑：**
+- URL 含 `arxiv.org` → arXiv 论文格式
+- 其他 → 博客文章格式
 
 ### 执行步骤
 

@@ -48,21 +48,62 @@ sources:
     selectors:
       - "a[href*='/news/']"
 
-  # ===== 补充来源（搜索兜底） =====
+  # ===== Anthropic 补充 =====
+  - name: "Anthropic Engineering Blog"
+    url: "https://www.anthropic.com/engineering"
+    type: page
+    priority: 1
+    enabled: true
+    selectors:
+      - "a[href*='/engineering/']"
+
+  # ===== OpenAI 补充 =====
+  - name: "OpenAI GitHub Blog"
+    url: "https://github.com/openai"
+    type: page
+    priority: 2
+    enabled: true
+
+  # ===== arXiv 精准搜索（priority 2，更积极抓取） =====
   - name: "arXiv OpenAI"
     url: "https://arxiv.org/search/?query=openai&searchtype=all&order=-announced_date_first"
     type: page
-    priority: 3
+    priority: 2
     enabled: true
 
   - name: "arXiv Anthropic"
     url: "https://arxiv.org/search/?query=anthropic&searchtype=all&order=-announced_date_first"
     type: page
+    priority: 2
+    enabled: true
+
+  # ===== 其他高质量来源 =====
+  - name: "Hugging Face Papers"
+    url: "https://huggingface.co/papers"
+    type: page
     priority: 3
     enabled: true
 
-  - name: "Hugging Face Papers"
-    url: "https://huggingface.co/papers"
+  - name: "Google DeepMind Blog"
+    url: "https://deepmind.google/discover/blog/"
+    type: page
+    priority: 2
+    enabled: true
+
+  - name: "Meta AI Blog"
+    url: "https://ai.meta.com/blog/"
+    type: page
+    priority: 3
+    enabled: true
+
+  - name: "arXiv CS.AI"
+    url: "https://arxiv.org/list/cs.AI/recent"
+    type: page
+    priority: 4
+    enabled: true
+
+  - name: "arXiv CS.CL"
+    url: "https://arxiv.org/list/cs.CL/recent"
     type: page
     priority: 4
     enabled: true

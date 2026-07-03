@@ -1,11 +1,20 @@
 {
   "version": 1,
-  "last_updated": "2026-07-01",
+  "last_updated": "2026-07-03",
   "articles": {
     "https://openai.com/index/introducing-genebench-pro": "2026-07-01",
     "https://www.anthropic.com/research/measuring-agent-autonomy": "2026-07-01",
     "https://www.anthropic.com/research/petri-open-source-auditing": "2026-07-01",
-    "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents": "2026-07-01"
+    "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents": "2026-07-01",
+    "https://arxiv.org/abs/2606.31174": "2026-07-02",
+    "https://arxiv.org/abs/2606.30850": "2026-07-02",
+    "https://arxiv.org/abs/2606.30840": "2026-07-02",
+    "https://arxiv.org/abs/2606.31182": "2026-07-02",
+    "https://arxiv.org/abs/2606.30774": "2026-07-02",
+    "https://arxiv.org/abs/2606.30931": "2026-07-02",
+    "https://alignment.anthropic.com/": "2026-07-02",
+    "https://openai.com/index/previewing-gpt-5-6-sol": "2026-07-03",
+    "https://www.anthropic.com/engineering/building-effective-agents": "2026-07-03"
   },
   "evergreen_push_counts": {
     "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents": 1
