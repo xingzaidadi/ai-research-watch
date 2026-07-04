@@ -1,331 +1,330 @@
-"# AI Research Watch - AI \u524d\u6cbf\u7814\u7a76\u6bcf\u65e5\u96f7\u8fbe
+# AI Research Watch - AI 前沿研究每日雷达
 
-## \u89e6\u53d1\u6761\u4ef6
-- \u7528\u6237\u8bf4\"\u67e5\u6700\u65b0\u7814\u7a76\"\"AI \u96f7\u8fbe\"\"research watch\"\"\u4eca\u65e5 AI \u8d44\u8baf\"
-- Cron \u5b9a\u65f6\u4efb\u52a1\u89e6\u53d1\uff08\u6bcf\u65e5 09:00 Asia/Shanghai\uff09
-- \u7528\u6237\u8bf4\"\u6709\u6ca1\u6709\u7a81\u53d1\u6587\u7ae0\"\uff08\u5b9e\u65f6\u6a21\u5f0f\uff09
+## 触发条件
+- 用户说"查最新研究""AI 雷达""research watch""今日 AI 资讯"
+- Cron 定时任务触发（每日 09:00 Asia/Shanghai）
+- 用户说"有没有突发文章"（实时模式）
 
-## \u5de5\u4f5c\u6d41\u7a0b
+## 工作流程
 
 ```mermaid
 flowchart TD
- A[\u89e6\u53d1] --> B{\u6a21\u5f0f\u5224\u65ad}
- B -->|\u6bcf\u65e5\u5b9a\u65f6| C[exec: fetch_rss.py \u6293\u53d6]
- B -->|\u5b9e\u65f6\u6309\u9700| D[web_access_tool \u6293\u53d6]
- C --> E[exec: score_articles.py \u8bc4\u5206]
- D --> E
- E --> F[exec: state_manager.py check \u53bb\u91cd]
- F --> G{\u6709\u65b0\u5185\u5bb9?}
- G -->|\u662f| H[exec: render_digest.py \u751f\u6210\u6458\u8981]
- G -->|\u5426| I[exec: state_manager.py \u9009\u8865\u8bfe\u6587\u7ae0]
- H --> J[message tool \u63a8\u9001\u98de\u4e66]
- I --> J
- J --> K[exec: state_manager.py mark \u8bb0\u5f55]
+    A[触发] --> B{模式判断}
+    B -->|每日定时| C[exec: fetch_rss.py 抓取]
+    B -->|实时按需| D[web_access_tool 抓取]
+    C --> E[exec: score_articles.py 评分]
+    D --> E
+    E --> F[exec: state_manager.py check 去重]
+    F --> G{有新内容?}
+    G -->|是| H[exec: render_digest.py 生成摘要]
+    G -->|否| I[exec: state_manager.py 选补课文章]
+    H --> J[message tool 推送飞书]
+    I --> J
+    J --> K[exec: state_manager.py mark 记录]
 ```
 
-> \u26a0\ufe0f \u6240\u6709\u8bc4\u5206/\u53bb\u91cd/\u6e32\u67d3\u903b\u8f91\u7531 Python \u811a\u672c\u6267\u884c\uff0c\u786e\u4fdd\u786e\u5b9a\u6027\u3002LLM \u53ea\u8d1f\u8d23\u300c\u6293\u53d6\u300d\u548c\u300c\u751f\u6210\u4e09\u53e5\u8bdd\u6458\u8981\u300d\u3002
+> ⚠️ 所有评分/去重/渲染逻辑由 Python 脚本执行，确保确定性。LLM 只负责「抓取」和「生成三句话摘要」。
 
-## \u811a\u672c\u8bf4\u660e
+## 脚本说明
 
-| \u811a\u672c | \u4f5c\u7528 | \u8f93\u5165 | \u8f93\u51fa |
+| 脚本 | 作用 | 输入 | 输出 |
 |------|------|------|------|
-| `scripts/fetch_rss.py` | \u6293\u53d6 RSS feed | URL \u5217\u8868 | JSON \u6587\u7ae0\u5217\u8868 |
-| `scripts/score_articles.py` | \u786e\u5b9a\u6027\u8bc4\u5206 | \u6587\u7ae0 JSON | \u8bc4\u5206\u540e JSON |
-| `scripts/state_manager.py` | \u72b6\u6001\u7ba1\u7406 | \u5b50\u547d\u4ee4 | JSON \u7ed3\u679c |
-| `scripts/render_digest.py` | \u6e32\u67d3\u63a8\u9001\u6587\u672c | \u8bc4\u5206\u540e JSON | \u683c\u5f0f\u5316\u6587\u672c |
+| `scripts/fetch_rss.py` | 抓取 RSS feed | URL 列表 | JSON 文章列表 |
+| `scripts/score_articles.py` | 确定性评分 | 文章 JSON | 评分后 JSON |
+| `scripts/state_manager.py` | 状态管理 | 子命令 | JSON 结果 |
+| `scripts/render_digest.py` | 渲染推送文本 | 评分后 JSON | 格式化文本 |
 
-### state_manager.py \u5b50\u547d\u4ee4
-- `stats` \u2014 \u67e5\u770b\u72b6\u6001\u7edf\u8ba1
-- `check <url>` \u2014 \u68c0\u67e5 URL \u662f\u5426\u5df2\u63a8\u9001
-- `mark <url>` \u2014 \u6807\u8bb0 URL \u4e3a\u5df2\u63a8\u9001
-- `check-title <title>` \u2014 \u68c0\u67e5\u6807\u9898\u76f8\u4f3c\u5ea6\u53bb\u91cd
-- `feedback <url> <up|down>` \u2014 \u8bb0\u5f55\u7528\u6237\u53cd\u9988
-- `cleanup` \u2014 \u6e05\u7406 30 \u5929\u524d\u7684\u8bb0\u5f55
+### state_manager.py 子命令
+- `stats` — 查看状态统计
+- `check <url>` — 检查 URL 是否已推送
+- `mark <url>` — 标记 URL 为已推送
+- `check-title <title>` — 检查标题相似度去重
+- `feedback <url> <up|down>` — 记录用户反馈
+- `cleanup` — 清理 30 天前的记录
 
-## \u6293\u53d6\u7b56\u7565
+## 抓取策略
 
-### \u4e09\u5c42\u964d\u7ea7
-1. **RSS \u4f18\u5148**\uff1aRSS \u6e90\u76f4\u63a5\u89e3\u6790 XML
-2. **HTML \u89e3\u6790**\uff1a\u65e0 RSS \u7684\u9875\u9762\u7528 web_access_tool \u6293\u53d6
-3. **\u641c\u7d22\u515c\u5e95**\uff1a\u524d\u4e24\u8005\u90fd\u5931\u8d25\u65f6\u7528 web_access_tool search
+### 三层降级
+1. **RSS 优先**：RSS 源直接解析 XML
+2. **HTML 解析**：无 RSS 的页面用 web_access_tool 抓取
+3. **搜索兜底**：前两者都失败时用 web_access_tool search
 
-### \u9519\u8bef\u5904\u7406
-- \u5355\u6e90\u5931\u8d25\u4e0d\u963b\u585e\u5176\u4ed6\u6e90\uff0c\u8bb0\u5f55\u9519\u8bef\u7ee7\u7eed
-- \u6240\u6709\u6e90\u90fd\u5931\u8d25\u65f6\uff0c\u63a8\u9001\"\u4eca\u65e5\u96f7\u8fbe\u5f02\u5e38\"\u901a\u77e5
-- \u8d85\u65f6\u9608\u503c\uff1a\u5355\u6e90 30 \u79d2
+### 错误处理
+- 单源失败不阻塞其他源，记录错误继续
+- 所有源都失败时，推送"今日雷达异常"通知
+- 超时阈值：单源 30 秒
 
-## \u8bc4\u5206\u89c4\u5219
+## 评分规则
 
-\u8bc4\u5206\u7531 `scripts/score_articles.py` \u786e\u5b9a\u6027\u6267\u884c\uff0c\u89c4\u5219\u5982\u4e0b\uff1a
+评分由 `scripts/score_articles.py` 确定性执行，规则如下：
 
-### \u6b63\u5206\uff08\u5438\u5f15\u5173\u6ce8\uff09
-| \u6761\u4ef6 | \u5206\u6570 |
+### 正分（吸引关注）
+| 条件 | 分数 |
 |------|------|
-| \u5b98\u65b9 Research / Publication | +5 |
+| 官方 Research / Publication | +5 |
 | System Card / Eval / Benchmark | +4 |
 | Agent / Reasoning / Alignment / Safety | +3 |
-| \u6a21\u578b\u53d1\u5e03 / \u6280\u672f\u8bf4\u660e | +2 |
-| \u542b eval_keywords.yml \u4e2d\u7684\u5173\u952e\u8bcd | +1~3 |
+| 模型发布 / 技术说明 | +2 |
+| 含 eval_keywords.yml 中的关键词 | +1~3 |
 
-### \u8d1f\u5206\uff08\u8fc7\u6ee4\u566a\u97f3\uff09
-| \u6761\u4ef6 | \u5206\u6570 |
+### 负分（过滤噪音）
+| 条件 | 分数 |
 |------|------|
-| \u7eaf\u8425\u9500 / \u62db\u8058 / \u5408\u4f5c\u65b0\u95fb\u7a3f | -3 |
-| \u975e\u6280\u672f\u5185\u5bb9\uff08office/funding\uff09 | -2 |
-| \u975e\u5b98\u65b9\u4e8c\u624b\u8f6c\u8ff0 | -5 |
-| \u5df2\u5728 seen.json \u4e2d | \u76f4\u63a5\u53bb\u91cd |
+| 纯营销 / 招聘 / 合作新闻稿 | -3 |
+| 非技术内容（office/funding） | -2 |
+| 非官方二手转述 | -5 |
+| 已在 seen.json 中 | 直接去重 |
 
-## \u53bb\u91cd\u673a\u5236
-- **URL \u7cbe\u786e\u53bb\u91cd**\uff1aseen.json \u5b58\u5df2\u63a8\u9001\u6587\u7ae0 URL
-- **\u6807\u9898\u76f8\u4f3c\u5ea6\u53bb\u91cd**\uff1a\u6807\u9898 Jaccard \u76f8\u4f3c\u5ea6 > 0.7 \u89c6\u4e3a\u91cd\u590d
-- **\u4fdd\u7559\u5929\u6570**\uff1aseen.json \u4fdd\u7559 30 \u5929\uff0c\u8d85\u8fc7\u81ea\u52a8\u6e05\u7406
+## 去重机制
+- **URL 精确去重**：seen.json 存已推送文章 URL
+- **标题相似度去重**：标题 Jaccard 相似度 > 0.7 视为重复
+- **保留天数**：seen.json 保留 30 天，超过自动清理
 
-## \u63a8\u9001\u683c\u5f0f
+## 推送格式
 
 ```
-\ud83d\udce1 \u4eca\u65e5 AI \u7814\u7a76\u96f7\u8fbe | {\u65e5\u671f}
+📡 今日 AI 研究雷达 | {日期}
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+━━━━━━━━━━━━━━━━━━
 
-{\u5e8f\u53f7}. {\u6807\u9898}
-\ud83d\udcce \u6765\u6e90\uff1a{OpenAI / Anthropic / arXiv}
-\ud83d\udcc2 \u7c7b\u578b\uff1a{Research / System Card / Eval / Model Release}
-\u2b50 \u91cd\u8981\u7a0b\u5ea6\uff1a{\u2605\u2605\u2605\u2605\u2605}
-\ud83d\udd17 \u94fe\u63a5\uff1a{url}
+{序号}. {标题}
+📎 来源：{OpenAI / Anthropic / arXiv}
+📂 类型：{Research / System Card / Eval / Model Release}
+⭐ 重要程度：{★★★★★}
+🔗 链接：{url}
 
-\ud83d\udca1 \u4e09\u53e5\u8bdd\u603b\u7ed3\uff1a
-\u2022 {\u89e3\u51b3\u4ec0\u4e48\u95ee\u9898}
-\u2022 {\u7528\u4e86\u4ec0\u4e48\u65b9\u6cd5}
-\u2022 {\u5bf9\u4f60\u7684\u542f\u53d1}
+💡 三句话总结：
+• {解决什么问题}
+• {用了什么方法}
+• {对你的启发}
 
-\ud83c\udfaf \u4f60\u9700\u8981\u5173\u6ce8\uff1a{\u5173\u952e\u8bcd1}\u3001{\u5173\u952e\u8bcd2}
+🎯 你需要关注：{关键词1}、{关键词2}
 
-\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501
+━━━━━━━━━━━━━━━━━━
 
-{\u6700\u591a 3 \u7bc7\u65b0\u6587\u7ae0}
+{最多 3 篇新文章}
 
-{\u5982\u6709\u8865\u8bfe\u6587\u7ae0}
-\ud83d\udcda \u4eca\u65e5\u8865\u8bfe\uff1a
-{\u8865\u8bfe\u6587\u7ae0\u6458\u8981}
+{如有补课文章}
+📚 今日补课：
+{补课文章摘要}
 ```
 
-## \u63a8\u9001\u6e20\u9053
-- **\u9ed8\u8ba4**\uff1a\u98de\u4e66\u79c1\u804a\u63a8\u9001\u7ed9\u7528\u6237\uff08ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef\uff09
-- **\u7d27\u6025/\u7a81\u53d1**\uff1a\u6807\u9898\u52a0 \ud83d\udd34 \u524d\u7f00
+## 推送渠道
+- **默认**：飞书私聊推送给用户（ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef）
+- **紧急/突发**：标题加 🔴 前缀
 
-## \u72b6\u6001\u7ba1\u7406
-- \u72b6\u6001\u6587\u4ef6\uff1a`state/seen.json`
-- \u683c\u5f0f\uff1a`{ \"url\": \"2026-07-01\", ... }`
-- \u6bcf\u6b21\u63a8\u9001\u540e\u66f4\u65b0
-- 30 \u5929\u524d\u7684\u6761\u76ee\u81ea\u52a8\u6e05\u7406
+## 状态管理
+- 状态文件：`state/seen.json`
+- 格式：`{ "url": "2026-07-01", ... }`
+- 每次推送后更新
+- 30 天前的条目自动清理
 
-## \u53cd\u9988\u673a\u5236
-- \u63a8\u9001\u540e\u7b49\u5f85\u7528\u6237 \ud83d\udc4d/\ud83d\udc4e \u53cd\u9988
-- \u8fde\u7eed 3 \u5929 \ud83d\udc4e \u7684\u4e3b\u9898\u964d\u6743\uff08\u8bc4\u5206 -1\uff09
-- \u7528\u6237\u624b\u52a8\u8bf4\"\u5173\u6ce8 XX\"\u7684\u4e3b\u9898\u52a0\u6743\uff08\u8bc4\u5206 +2\uff09
+## 反馈机制
+- 推送后等待用户 👍/👎 反馈
+- 连续 3 天 👎 的主题降权（评分 -1）
+- 用户手动说"关注 XX"的主题加权（评分 +2）
 
-## \u8865\u8bfe\u673a\u5236
-- \u5f53\u5929\u65e0\u65b0\u5185\u5bb9\u65f6\u89e6\u53d1
-- \u4ece `references/evergreen_articles.yml` \u4e2d\u9009\u53d6
-- \u4f18\u5148\u9009\u672a\u63a8\u9001\u8fc7\u7684
-- \u6bcf\u7bc7\u6700\u591a\u63a8\u9001 2 \u6b21\u540e\u79fb\u51fa\u5019\u9009\u6c60
+## 补课机制
+- 当天无新内容时触发
+- 从 `references/evergreen_articles.yml` 中选取
+- 优先选未推送过的
+- 每篇最多推送 2 次后移出候选池
 
 ---
 
-## \u8bba\u6587\u5168\u6587\u6293\u53d6\uff08\u6df1\u5ea6\u9605\u8bfb\u6a21\u5f0f\uff09
+## 论文全文抓取（深度阅读模式）
 
-### \u89e6\u53d1\u6761\u4ef6
-- \u7528\u6237\u8bf4\"\u4e0b\u8f7d\u8bba\u6587\u5168\u6587\"\"\u83b7\u53d6\u8bba\u6587\u539f\u6587\"\"\u6293\u53d6\u8bba\u6587\"\"download paper\" \"fetch paper\" \"\u4e0b\u8f7d\u8fd9\u7bc7\u6587\u7ae0\" \"\u628a\u8fd9\u7bc7\u641e\u4e0b\u6765\"
-- \u7528\u6237\u7ed9\u51fa arXiv \u94fe\u63a5/ID \u8981\u6c42\u83b7\u53d6\u5185\u5bb9
-- \u7528\u6237\u7ed9\u51fa\u4efb\u610f\u6587\u7ae0\u94fe\u63a5\uff08\u535a\u5ba2/arXiv/\u65b0\u95fb\uff09\u8981\u6c42\u4e0b\u8f7d
-- \u7528\u6237\u8bf4\"\u628a\u8fd9\u7bc7\u8bba\u6587\u641e\u4e0b\u6765\"\"\u539f\u6587\u5728\u54ea\"
+### 触发条件
+- 用户说"下载论文全文""获取论文原文""抓取论文""download paper" "fetch paper" "下载这篇文章" "把这篇搞下来"
+- 用户给出 arXiv 链接/ID 要求获取内容
+- 用户给出任意文章链接（博客/arXiv/新闻）要求下载
+- 用户说"把这篇论文搞下来""原文在哪"
 
-### \u6293\u53d6\u7b56\u7565\uff08\u4e09\u8def fallback\uff0c\u786e\u4fdd\u6210\u529f\uff09
+### 抓取策略（三路 fallback，确保成功）
 
-| \u4f18\u5148\u7ea7 | \u7b56\u7565 | \u4f18\u70b9 | \u7f3a\u70b9 |
+| 优先级 | 策略 | 优点 | 缺点 |
 |--------|------|------|------|
-| 1\ufe0f\u20e3 | arXiv HTML | \u901f\u5ea6\u5feb\u3001\u53ef\u8bfb\u6587\u672c | \u975e\u6240\u6709\u8bba\u6587\u90fd\u6709 |
-| 2\ufe0f\u20e3 | arXiv LaTeX \u6e90\u7801 | \u542b\u516c\u5f0f/\u4ee3\u7801/\u5b8c\u6574\u5185\u5bb9 | \u9700\u89e3\u538b\u89e3\u6790 |
-| 3\ufe0f\u20e3 | arXiv PDF | \u603b\u662f\u53ef\u7528 | \u6587\u672c\u63d0\u53d6\u56f0\u96be |
+| 1️⃣ | arXiv HTML | 速度快、可读文本 | 非所有论文都有 |
+| 2️⃣ | arXiv LaTeX 源码 | 含公式/代码/完整内容 | 需解压解析 |
+| 3️⃣ | arXiv PDF | 总是可用 | 文本提取困难 |
 
-**\u5173\u952e\u8bbe\u8ba1**\uff1a\u4e32\u884c\u5c1d\u8bd5\uff0c\u6bcf\u6b65\u6210\u529f\u90fd\u7ee7\u7eed\u5c1d\u8bd5\u540e\u7eed\u7b56\u7565\u4f5c\u4e3a\u5907\u4efd\uff0c\u6700\u7ec8\u9009\u6700\u4f73\u683c\u5f0f\u3002
+**关键设计**：串行尝试，每步成功都继续尝试后续策略作为备份，最终选最佳格式。
 
-### \u5de5\u4f5c\u6d41\u7a0b
+### 工作流程
 
 ```mermaid
 flowchart TD
- A[\u7528\u6237\u8bf7\u6c42] --> B[extract_arxiv_id]
- B --> C[\u83b7\u53d6\u5143\u6570\u636e title/authors/abstract]
- C --> D[\u7b56\u75651: arXiv HTML]
- D -->|\u6210\u529f| E[\u4fdd\u5b58\u6587\u672c]
- D -->|\u5931\u8d25| F[\u7b56\u75652: LaTeX \u6e90\u7801]
- E --> F
- F -->|\u6210\u529f| G[\u89e3\u538b+\u63d0\u53d6\u6587\u672c]
- F -->|\u5931\u8d25| H[\u7b56\u75653: PDF]
- G --> H
- H --> I[\u4fdd\u5b58\u6240\u6709\u683c\u5f0f\u5230\u672c\u5730]
- I --> J[\u521b\u5efa\u98de\u4e66\u6587\u6863\u5230\u6307\u5b9a\u6587\u4ef6\u5939]
- J --> K[\u751f\u6210\u9605\u8bfb\u6458\u8981]
+    A[用户请求] --> B[extract_arxiv_id]
+    B --> C[获取元数据 title/authors/abstract]
+    C --> D[策略1: arXiv HTML]
+    D -->|成功| E[保存文本]
+    D -->|失败| F[策略2: LaTeX 源码]
+    E --> F
+    F -->|成功| G[解压+提取文本]
+    F -->|失败| H[策略3: PDF]
+    G --> H
+    H --> I[保存所有格式到本地]
+    I --> J[创建飞书文档到指定文件夹]
+    J --> K[生成阅读摘要]
 ```
 
-### \u4fdd\u5b58\u4e3a\u98de\u4e66\u6587\u6863\uff08\u5f3a\u5236\u89c4\u5219\uff09
+### 保存为飞书文档（强制规则）
 
-\u6293\u53d6\u5b8c\u6210\u540e\uff0c\u5c06\u8bba\u6587\u5185\u5bb9\u4fdd\u5b58\u4e3a\u98de\u4e66\u6587\u6863\uff0c**\u5fc5\u987b\u9075\u5b88\u4ee5\u4e0b\u4e09\u6761\u94c1\u5f8b**\uff1a
+抓取完成后，将论文内容保存为飞书文档，**必须遵守以下三条铁律**：
 
-#### \u94c1\u5f8b\u4e00\uff1a\u6309 writing-guidelines.md \u62c6\u89e3
+#### 铁律一：按 writing-guidelines.md 拆解
 
-\u6240\u6709\u4e0b\u8f7d\u7684\u6587\u7ae0\u5fc5\u987b\u6309 `memory/writing-guidelines.md` \u7684\u7ae0\u8282\u6a21\u677f\u62c6\u89e3\uff0c\u4e0d\u80fd\u53ea\u662f\u642c\u8fd0\u539f\u6587\u3002
+所有下载的文章必须按 `memory/writing-guidelines.md` 的章节模板拆解，不能只是搬运原文。
 
-\u6bcf\u4e2a\u7ae0\u8282\u5fc5\u987b\u5305\u542b\uff1a
-- `> \ud83d\udccc \u4e00\u53e5\u8bdd\u951a\u5b9a`\uff08blockquote\uff09
-- `## \ud83d\udd0d \u4e3a\u4ec0\u4e48\u9700\u8981\u5b83\uff1f`\uff08\u573a\u666f\u6545\u4e8b\u5207\u5165\uff09
-- `## \ud83e\udde9 \u6838\u5fc3\u62c6\u89e3`\uff08\u6587\u5b57\u62c6\u89e3 + \u5bf9\u6bd4\u8868\u683c + \u6a59\u8272 callout\uff09
-- `## \u26a0\ufe0f \u8fb9\u5b66\u8fb9\u8e29\u5751`\uff08\u95ee\u9898\u2192\u540e\u679c\u2192\u65b9\u6848\u8868\u683c\uff09
-- `## \ud83d\udd17 \u5173\u8054\u7ae0\u8282`\uff08\u524d\u7f6e\u9884\u544a + \u56de\u6eaf\u5f15\u7528\uff09
-- `## \ud83d\udccc \u672c\u7ae0\u6700\u8be5\u8bb0\u4f4f\u7684\u4e00\u53e5\u8bdd`
-- `## \ud83d\udcac \u9762\u8bd5\u51c6\u5907`\uff08\u84dd\u8272 callout Q&A\uff09
+每个章节必须包含：
+- `> 📌 一句话锚定`（blockquote）
+- `## 🔍 为什么需要它？`（场景故事切入）
+- `## 🧩 核心拆解`（文字拆解 + 对比表格 + 橙色 callout）
+- `## ⚠️ 边学边踩坑`（问题→后果→方案表格）
+- `## 🔗 关联章节`（前置预告 + 回溯引用）
+- `## 📌 本章最该记住的一句话`
+- `## 💬 面试准备`（蓝色 callout Q&A）
 
-Callout \u989c\u8272\u8bed\u4e49\uff08\u5fc5\u987b\u4e00\u81f4\uff09\uff1a
-- \ud83d\udfe0 \u6a59\u8272\uff1a\u6838\u5fc3\u5b9a\u4e49\u3001\u4e00\u53e5\u8bdd\u7406\u89e3
-- \ud83d\udd35 \u84dd\u8272\uff1a\u9762\u8bd5\u8bdd\u672f
-- \ud83d\udd34 \u7ea2\u8272\uff1a\u8e29\u5751\u3001\u98ce\u9669\u8b66\u544a
-- \ud83d\udfe1 \u9ec4\u8272\uff1a\u5173\u8054\u7ae0\u8282
-- \ud83d\udfe2 \u7eff\u8272\uff1a\u6700\u4f73\u5b9e\u8df5
+Callout 颜色语义（必须一致）：
+- 🟠 橙色：核心定义、一句话理解
+- 🔵 蓝色：面试话术
+- 🔴 红色：踩坑、风险警告
+- 🟡 黄色：关联章节
+- 🟢 绿色：最佳实践
 
-#### \u94c1\u5f8b\u4e8c\uff1a\u6587\u6863\u6240\u6709\u6743\u6388\u4e88\u7528\u6237
+#### 铁律二：文档所有权授予用户
 
-\u6240\u6709\u7528 `feishu_lark_cli docs +create` \u521b\u5efa\u7684\u6587\u6863\uff0c**\u5fc5\u987b\u786e\u4fdd\u7528\u6237\u62e5\u6709 full_access \u6743\u9650**\u3002
-- \u4f18\u5148\u4f7f\u7528 `--as user` \u521b\u5efa\uff08\u7528\u6237\u8eab\u4efd\u76f4\u63a5\u6709\u6587\u4ef6\u5939\u6743\u9650\uff09
-- \u5982\u679c\u7528 `--as bot`\uff0cCLI \u4f1a\u81ea\u52a8\u5c1d\u8bd5\u6388\u6743\uff1b\u81ea\u52a8\u6388\u6743\u5931\u8d25\u65f6\uff0c\u624b\u52a8\u8c03\u7528 `feishu_lark_cli drive +permission` \u6388\u6743
-- **\u964d\u7ea7\u7b56\u7565**\uff1a`--as bot` \u62a5 `Permission denied` \u2192 \u81ea\u52a8\u5207\u6362 `--as user` \u91cd\u8bd5
-- \u7528\u6237 open_id\uff1a`ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef`
+所有用 `feishu_lark_cli docs +create` 创建的文档，**必须确保用户拥有 full_access 权限**。
+- 优先使用 `--as user` 创建（用户身份直接有文件夹权限）
+- 如果用 `--as bot`，CLI 会自动尝试授权；自动授权失败时，手动调用 `feishu_lark_cli drive +permission` 授权
+- **降级策略**：`--as bot` 报 `Permission denied` → 自动切换 `--as user` 重试
+- 用户 open_id：`ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef`
 
-#### \u94c1\u5f8b\u4e09\uff1a\u4fdd\u5b58\u5230\u6307\u5b9a\u6587\u4ef6\u5939
+#### 铁律三：保存到指定文件夹
 
-\u6240\u6709\u6587\u6863\u5fc5\u987b\u4fdd\u5b58\u5230\u7528\u6237\u6307\u5b9a\u7684\u8bba\u6587\u5e93\u6587\u4ef6\u5939\uff1a
-- **\u76ee\u6807\u6587\u4ef6\u5939 token**\uff1a`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
-- **\u521b\u5efa\u547d\u4ee4**\uff1a`feishu_lark_cli docs +create --api-version v2 --as user --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe --content '...'`
-- **\u6743\u9650\u964d\u7ea7**\uff1a\u5982\u679c `--as user` \u4e0d\u53ef\u7528\uff08\u5982\u7528\u6237 OAuth \u8fc7\u671f\uff09\uff0c\u6539\u7528 `--as bot` + \u81ea\u52a8\u6388\u6743
-- \u521b\u5efa\u540e\u81ea\u52a8\u83b7\u5f97 full_access \u6743\u9650
+所有文档必须保存到用户指定的论文库文件夹：
+- **目标文件夹 token**：`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
+- **创建命令**：`feishu_lark_cli docs +create --api-version v2 --as user --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe --content '...'`
+- **权限降级**：如果 `--as user` 不可用（如用户 OAuth 过期），改用 `--as bot` + 自动授权
+- 创建后自动获得 full_access 权限
 
-#### \u6587\u6863\u547d\u540d
-- **arXiv \u8bba\u6587**\uff1a`{\u65e5\u671f}_{\u8bba\u6587\u6807\u9898}`
-- **\u535a\u5ba2\u6587\u7ae0**\uff1a`{\u65e5\u671f}_{\u6765\u6e90}_{\u6587\u7ae0\u6807\u9898}`
+#### 文档命名
+- **arXiv 论文**：`{日期}_{论文标题}`
+- **博客文章**：`{日期}_{来源}_{文章标题}`
 
-#### \u6587\u6863\u5185\u5bb9\u7ed3\u6784\u6a21\u677f
+#### 文档内容结构模板
 ```xml
-<title>{\u65e5\u671f}_{\u6807\u9898}</title>
-<callout emoji=\"\ud83d\udca1\" background-color=\"orange\"><b>\u4e00\u53e5\u8bdd\u7406\u89e3</b>\uff1a{\u6838\u5fc3\u7ed3\u8bba}</callout>
-<p><i>\u6765\u6e90\uff1a{\u6765\u6e90\u94fe\u63a5} | \u4f5c\u8005\uff1a{\u4f5c\u8005}</i></p>
+<title>{日期}_{标题}</title>
+<callout emoji="💡" background-color="orange"><b>一句话理解</b>：{核心结论}</callout>
+<p><i>来源：{来源链接} | 作者：{作者}</i></p>
 <hr/>
-# \u7b2c\u4e00\u7ae0\u3001{\u7ae0\u8282\u6807\u9898}
-> \ud83d\udccc {\u4e00\u53e5\u8bdd\u951a\u5b9a}
-## \ud83d\udd0d \u4e3a\u4ec0\u4e48\u9700\u8981\u5b83\uff1f
-{\u573a\u666f\u6545\u4e8b}
-## \ud83e\udde9 \u6838\u5fc3\u62c6\u89e3
-{\u6587\u5b57+\u8868\u683c+callout}
-## \u26a0\ufe0f \u8fb9\u5b66\u8fb9\u8e29\u5751
-{\u8e29\u5751\u8868\u683c}
-## \ud83d\udd17 \u5173\u8054\u7ae0\u8282
-{\u53cc\u5411\u7ec7\u7f51\u8868}
-## \ud83d\udccc \u672c\u7ae0\u6700\u8be5\u8bb0\u4f4f\u7684\u4e00\u53e5\u8bdd
-> {\u4e00\u53e5\u8bdd}
-## \ud83d\udcac \u9762\u8bd5\u51c6\u5907
-<callout emoji=\"\ud83d\udcac\" background-color=\"blue\">{Q&A}</callout>
+# 第一章、{章节标题}
+> 📌 {一句话锚定}
+## 🔍 为什么需要它？
+{场景故事}
+## 🧩 核心拆解
+{文字+表格+callout}
+## ⚠️ 边学边踩坑
+{踩坑表格}
+## 🔗 关联章节
+{双向织网表}
+## 📌 本章最该记住的一句话
+> {一句话}
+## 💬 面试准备
+<callout emoji="💬" background-color="blue">{Q&A}</callout>
 <hr/>
-{...\u540e\u7eed\u7ae0\u8282...}
+{...后续章节...}
 
-## \ud83d\udcce \u4e0b\u8f7d\u94fe\u63a5
-{\u6839\u636e\u6587\u7ae0\u7c7b\u578b\u9009\u62e9\u5bf9\u5e94\u683c\u5f0f}
+## 📎 下载链接
+{根据文章类型选择对应格式}
 ```
 
-#### \u4e0b\u8f7d\u94fe\u63a5\u683c\u5f0f\uff08\u6309\u6587\u7ae0\u7c7b\u578b\u533a\u5206\uff09
+#### 下载链接格式（按文章类型区分）
 
-**arXiv \u8bba\u6587\uff1a**
+**arXiv 论文：**
 ```xml
-<h1>\ud83d\udcce \u4e0b\u8f7d\u94fe\u63a5</h1>
-<p>\ud83d\udcc4 <a href=\"https://arxiv.org/pdf/{ID}\">PDF \u5168\u6587</a> | \ud83d\udccb <a href=\"https://arxiv.org/abs/{ID}\">arXiv \u9875\u9762</a> | \ud83d\udcbb <a href=\"{github_url}\">GitHub \u4ee3\u7801</a></p>
+<h1>📎 下载链接</h1>
+<p>📄 <a href="https://arxiv.org/pdf/{ID}">PDF 全文</a> | 📋 <a href="https://arxiv.org/abs/{ID}">arXiv 页面</a> | 💻 <a href="{github_url}">GitHub 代码</a></p>
 ```
-- \u4e09\u4e2a\u5165\u53e3\u90fd\u6709\u5c31\u5168\u653e\uff0c\u7f3a\u54ea\u4e2a\u5c31\u4e0d\u653e\u54ea\u4e2a\uff0c\u522b\u51d1\u6570
+- 三个入口都有就全放，缺哪个就不放哪个，别凑数
 
-**\u535a\u5ba2\u6587\u7ae0\uff08Anthropic/OpenAI/Google \u7b49\uff09\uff1a**
+**博客文章（Anthropic/OpenAI/Google 等）：**
 ```xml
-<h1>\ud83d\udcce \u539f\u6587\u94fe\u63a5</h1>
-<p>\ud83d\udcc4 <a href=\"{original_url}\">\u539f\u6587</a> | \ud83d\udcbb <a href=\"{related_github}\">\u76f8\u5173\u4ee3\u7801/ Cookbook</a></p>
+<h1>📎 原文链接</h1>
+<p>📄 <a href="{original_url}">原文</a> | 💻 <a href="{related_github}">相关代码/ Cookbook</a></p>
 ```
-- \u539f\u6587\u5fc5\u653e\uff0c\u76f8\u5173\u4ee3\u7801/ Cookbook \u6709\u5c31\u653e\uff0c\u6ca1\u6709\u5c31\u4e0d\u653e
+- 原文必放，相关代码/ Cookbook 有就放，没有就不放
 
-**\u5224\u65ad\u903b\u8f91\uff1a**
-- URL \u542b `arxiv.org` \u2192 arXiv \u8bba\u6587\u683c\u5f0f
-- \u5176\u4ed6 \u2192 \u535a\u5ba2\u6587\u7ae0\u683c\u5f0f
+**判断逻辑：**
+- URL 含 `arxiv.org` → arXiv 论文格式
+- 其他 → 博客文章格式
 
-### \u6267\u884c\u6b65\u9aa4
+### 执行步骤
 
-> \u26a0\ufe0f **\u7b2c 0 \u6b65\uff08\u5f3a\u5236\uff09**\uff1a\u6536\u5230\u4e0b\u8f7d\u8bf7\u6c42\u540e\uff0c\u5fc5\u987b\u5148\u6267\u884c `ls scripts/` \u786e\u8ba4\u53ef\u7528\u811a\u672c\uff0c\u518d\u6309\u4ee5\u4e0b\u6b65\u9aa4\u64cd\u4f5c\u3002\u7981\u6b62\u51ed\u8bb0\u5fc6\u624b\u52a8 curl/python \u63d0\u53d6\u3002\u4e0b\u8f7d\u5fc5\u987b\u7528 `fetch_paper.py`\uff0c\u751f\u6210\u6587\u6863\u5185\u5bb9\u5fc5\u987b\u7528 `render_paper_doc.py`\u3002\u5982\u811a\u672c\u7f3a\u5931\uff0c\u5148\u62a5\u544a\u7528\u6237\u518d\u624b\u52a8\u8865\u5168\u3002
+> ⚠️ **第 0 步（强制）**：收到下载请求后，必须先执行 `ls scripts/` 确认可用脚本，再按以下步骤操作。禁止凭记忆手动 curl/python 提取。下载必须用 `fetch_paper.py`，生成文档内容必须用 `render_paper_doc.py`。如脚本缺失，先报告用户再手动补全。
 
-0. **\u68c0\u67e5\u5de5\u5177\u94fe**\uff1a`ls scripts/` \u2192 \u786e\u8ba4 `fetch_paper.py` \u548c `render_paper_doc.py` \u5b58\u5728
-1. **\u4e0b\u8f7d\u8bba\u6587**\uff1a`python3 scripts/fetch_paper.py <ID> -o /tmp/papers` \u2192 \u81ea\u52a8\u4e09\u8def fallback
-2. **\u83b7\u53d6\u5143\u6570\u636e**\uff1a\u4ece `{ID}.result.json` \u8bfb\u53d6 title/authors/abstract
-3. **\u751f\u6210\u6587\u6863\u5185\u5bb9**\uff1a\u6784\u9020 JSON \u2192 `python3 scripts/render_paper_doc.py -i data.json -o doc.xml`
-4. **\u521b\u5efa\u98de\u4e66\u6587\u6863**\uff1a\u7528 `feishu_lark_cli` \u9010\u7ae0\u4e32\u884c\u8ffd\u52a0\u5230\u6307\u5b9a\u6587\u4ef6\u5939\uff08\u89c1\u94c1\u5f8b\u56db~\u4e03\uff09
-5. **\u63a8\u9001\u901a\u77e5**\uff1a\u544a\u77e5\u7528\u6237\u6587\u6863\u5df2\u521b\u5efa\uff0c\u9644\u98de\u4e66\u94fe\u63a5
+0. **检查工具链**：`ls scripts/` → 确认 `fetch_paper.py` 和 `render_paper_doc.py` 存在
+1. **下载论文**：`python3 scripts/fetch_paper.py <ID> -o /tmp/papers` → 自动三路 fallback
+2. **获取元数据**：从 `{ID}.result.json` 读取 title/authors/abstract
+3. **生成文档内容**：构造 JSON → `python3 scripts/render_paper_doc.py -i data.json -o doc.xml`
+4. **创建飞书文档**：用 `feishu_lark_cli` 逐章串行追加到指定文件夹（见铁律四~七）
+5. **推送通知**：告知用户文档已创建，附飞书链接
 
-### \u811a\u672c
+### 脚本
 
-| \u811a\u672c | \u4f5c\u7528 |
+| 脚本 | 作用 |
 |------|------|
-| `scripts/fetch_paper.py` | arXiv \u8bba\u6587\u4e0b\u8f7d\uff08\u4e09\u8def fallback\uff09 |
-| `scripts/render_paper_doc.py` | JSON \u2192 \u98de\u4e66 DocxXML\uff08\u6309 writing-guidelines \u6a21\u677f\u6e32\u67d3\uff09 |
+| `scripts/fetch_paper.py` | arXiv 论文下载（三路 fallback） |
+| `scripts/render_paper_doc.py` | JSON → 飞书 DocxXML（按 writing-guidelines 模板渲染） |
 
-#### render_paper_doc.py \u7528\u6cd5
+#### render_paper_doc.py 用法
 
 ```bash
-# \u8f93\u5165 JSON \u6587\u4ef6\uff0c\u8f93\u51fa\u98de\u4e66 XML
+# 输入 JSON 文件，输出飞书 XML
 python3 scripts/render_paper_doc.py -i paper_data.json -o doc.xml
 
-# \u4ec5\u6821\u9a8c JSON \u683c\u5f0f
+# 仅校验 JSON 格式
 python3 scripts/render_paper_doc.py -i paper_data.json --validate
 ```
 
-JSON \u8f93\u5165\u683c\u5f0f\u89c1\u811a\u672c\u5185 docstring\uff0c\u6838\u5fc3\u5b57\u6bb5\uff1a`title`, `arxiv_id`, `authors`, `source_url`, `one_liner`, `sections[]`\u3002\u6bcf\u4e2a section \u5305\u542b `title`, `anchor`, `why`, `core`, `pitfalls[]`, `related[]`, `remember`, `interview_qa[]`\u3002
+JSON 输入格式见脚本内 docstring，核心字段：`title`, `arxiv_id`, `authors`, `source_url`, `one_liner`, `sections[]`。每个 section 包含 `title`, `anchor`, `why`, `core`, `pitfalls[]`, `related[]`, `remember`, `interview_qa[]`。
 
-### \u8f93\u51fa\u6587\u4ef6\uff08\u672c\u5730\u4e34\u65f6\uff09
+### 输出文件（本地临时）
 
-| \u6587\u4ef6 | \u5185\u5bb9 |
+| 文件 | 内容 |
 |------|------|
-| `{ID}.html.txt` | HTML \u5168\u6587\u6587\u672c |
-| `{ID}-source.tar.gz` | LaTeX \u6e90\u7801\u538b\u7f29\u5305 |
-| `{ID}-src/*.tex` | \u89e3\u538b\u540e\u7684 .tex \u6587\u4ef6 |
-| `{ID}.latex.txt` | \u63d0\u53d6\u7684 LaTeX \u7eaf\u6587\u672c |
-| `{ID}.pdf` | PDF \u539f\u6587\u4ef6 |
-| `{ID}.result.json` | \u5143\u6570\u636e + \u4e0b\u8f7d\u7ed3\u679c JSON |
+| `{ID}.html.txt` | HTML 全文文本 |
+| `{ID}-source.tar.gz` | LaTeX 源码压缩包 |
+| `{ID}-src/*.tex` | 解压后的 .tex 文件 |
+| `{ID}.latex.txt` | 提取的 LaTeX 纯文本 |
+| `{ID}.pdf` | PDF 原文件 |
+| `{ID}.result.json` | 元数据 + 下载结果 JSON |
 
-### \u26a0\ufe0f \u98de\u4e66 API \u94c1\u5f8b\uff08\u9632\u5751\uff09
+### ⚠️ 飞书 API 铁律（防坑）
 
-#### \u94c1\u5f8b\u56db\uff1aXML \u5c5e\u6027\u4e00\u5f8b\u7528\u5355\u5f15\u53f7
+#### 铁律四：XML 属性一律用单引号
 
-\u98de\u4e66 DocxXML \u7684 callout \u7b49\u6807\u7b7e\u5c5e\u6027\u5fc5\u987b\u7528**\u5355\u5f15\u53f7**\uff0c\u4e0d\u80fd\u7528\u53cc\u5f15\u53f7\uff1a
-- \u2705 `<callout emoji='\ud83d\udca1' background-color='orange'>`
-- \u274c `<callout emoji=\"\ud83d\udca1\" background-color=\"orange\">`
+飞书 DocxXML 的 callout 等标签属性必须用**单引号**，不能用双引号：
+- ✅ `<callout emoji='💡' background-color='orange'>`
+- ❌ `<callout emoji="💡" background-color="orange">`
 
-\u539f\u56e0\uff1a\u53cc\u5f15\u53f7\u5728 JSON \u5e8f\u5217\u5316\u65f6\u4ea7\u751f `\\"` \u8f6c\u4e49\uff0c\u5bfc\u81f4 `feishu_lark_cli` \u7684 args \u88ab\u8bc6\u522b\u4e3a string \u800c\u975e array\uff0c\u62a5 `args: must be array` \u9519\u8bef\u3002
+原因：双引号在 JSON 序列化时产生 `\"` 转义，导致 `feishu_lark_cli` 的 args 被识别为 string 而非 array，报 `args: must be array` 错误。
 
-#### \u94c1\u5f8b\u4e94\uff1aappend \u5fc5\u987b\u4e32\u884c\uff0c\u7981\u6b62\u5e76\u884c
+#### 铁律五：append 必须串行，禁止并行
 
-`feishu_lark_cli docs +update --command append` \u7684 API **\u4e0d\u4fdd\u8bc1\u5e76\u884c\u8c03\u7528\u7684\u5199\u5165\u987a\u5e8f**\u3002
-- \u2705 \u9010\u7ae0\u987a\u5e8f\u8c03\u7528\uff1a\u7b2c 1 \u7ae0 append \u2192 \u7b49\u8fd4\u56de \u2192 \u7b2c 2 \u7ae0 append \u2192 \u7b49\u8fd4\u56de \u2192 ...
-- \u274c \u540c\u65f6\u53d1\u51fa\u591a\u4e2a append \u8bf7\u6c42
+`feishu_lark_cli docs +update --command append` 的 API **不保证并行调用的写入顺序**。
+- ✅ 逐章顺序调用：第 1 章 append → 等返回 → 第 2 章 append → 等返回 → ...
+- ❌ 同时发出多个 append 请求
 
-\u8fdd\u53cd\u6b64\u89c4\u5219\u4f1a\u5bfc\u81f4\u7ae0\u8282\u987a\u5e8f\u4e71\u6389\u3002
+违反此规则会导致章节顺序乱掉。
 
-#### \u94c1\u5f8b\u516d\uff1a\u5355\u6b21 append \u4e0d\u8d85\u8fc7 1 \u7ae0
+#### 铁律六：单次 append 不超过 1 章
 
-\u5355\u6b21 append \u7684\u5185\u5bb9\u8fc7\u957f\u4f1a\u88ab\u622a\u65ad\u6216\u4e22\u5931\u683c\u5f0f\u3002\u6bcf\u6b21 append \u53ea\u4f20**\u4e00\u4e2a\u7ae0\u8282**\u7684\u5b8c\u6574\u5185\u5bb9\uff08\u542b\u6240\u6709\u5b50\u6a21\u5757\uff1a\u951a\u5b9a/\u4e3a\u4ec0\u4e48/\u6838\u5fc3\u62c6\u89e3/\u8e29\u5751/\u5173\u8054/\u9762\u8bd5\uff09\u3002\u5982\u679c\u4e00\u7ae0\u5185\u5bb9\u4ecd\u7136\u592a\u957f\uff0c\u62c6\u5206\u4e3a\u201c\u6838\u5fc3\u62c6\u89e3\u201d\u548c\u201c\u8e29\u5751+\u5173\u8054+\u9762\u8bd5\u201d\u4e24\u6b21 append\u3002
+单次 append 的内容过长会被截断或丢失格式。每次 append 只传**一个章节**的完整内容（含所有子模块：锚定/为什么/核心拆解/踩坑/关联/面试）。如果一章内容仍然太长，拆分为“核心拆解”和“踩坑+关联+面试”两次 append。
 
-#### \u94c1\u5f8b\u4e03\uff1aoverwrite \u524d\u5148\u786e\u8ba4
+#### 铁律七：overwrite 前先确认
 
-\u4f7f\u7528 `--command overwrite` \u4f1a**\u6e05\u7a7a\u6574\u4e2a\u6587\u6863**\u3002\u4ec5\u5728\u4ee5\u4e0b\u573a\u666f\u4f7f\u7528\uff1a
-- \u6587\u6863\u521a\u521b\u5efa\uff0c\u53ea\u6709\u9aa8\u67b6\u9700\u8981\u91cd\u5199
-- \u7528\u6237\u660e\u786e\u8981\u6c42\u91cd\u5199
-- \u4e0d\u8981\u5728\u6709\u5185\u5bb9\u7684\u6587\u6863\u4e0a overwrite
-"
+使用 `--command overwrite` 会**清空整个文档**。仅在以下场景使用：
+- 文档刚创建，只有骨架需要重写
+- 用户明确要求重写
+- 不要在有内容的文档上 overwrite
