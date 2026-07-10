@@ -28,16 +28,61 @@ def load_keywords():
         }
     }
 
-def score_article(title, description, url, source_name):
+def score_article(title, description, url, source_name, pub_date=None):
     """
     确定性评分：基于规则，不依赖 LLM
     返回 (score, reasons)
+    pub_date: 发布日期字符串（用于时效性加权）
     """
     score = 0
     reasons = []
 
+    # === 时效性加权（最重要！） ===
+    from datetime import datetime, timedelta
+    now = datetime.utcnow()
+    if pub_date:
+        try:
+            # 清理日期字符串（去掉时区后缀如 GMT/UTC）
+            import re
+            clean_date = re.sub(r'\s+(GMT|UTC|[+-]\d{4})$', '', pub_date.strip())
+            # 尝试解析多种日期格式
+            for fmt in ["%a, %d %b %Y %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"]:
+                try:
+                    pub_dt = datetime.strptime(clean_date[:len(fmt)+5], fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                pub_dt = None
+
+            if pub_dt:
+                age_days = (now - pub_dt).days
+                if age_days <= 1:
+                    score += 10
+                    reasons.append(f"🔥 今日发布 ({age_days}天前) (+10)")
+                elif age_days <= 3:
+                    score += 8
+                    reasons.append(f"⚡ 近3天 ({age_days}天前) (+8)")
+                elif age_days <= 7:
+                    score += 5
+                    reasons.append(f"📅 本周 ({age_days}天前) (+5)")
+                elif age_days <= 30:
+                    score += 2
+                    reasons.append(f"📆 近期 ({age_days}天前) (+2)")
+                else:
+                    score -= 10
+                    reasons.append(f"⏰ 超过30天 ({age_days}天前) (-10)")
+        except Exception:
+            pass
+
     # === 正分：来源类型 ===
     title_lower = (title + " " + description).lower()
+
+    # 模型发布 / 重大产品更新 (+6) — 提升权重！
+    model_signals = ["introducing", "release", "launch", "new model", "gpt-", "claude", "o3", "o4"]
+    if any(s in title_lower for s in model_signals):
+        score += 6
+        reasons.append("模型发布/重大更新 (+6)")
 
     # 官方研究 / Publication (+5)
     research_signals = ["research", "paper", "study", "arxiv", "publication"]
@@ -60,12 +105,6 @@ def score_article(title, description, url, source_name):
     if any(s in title_lower for s in agent_signals):
         score += 3
         reasons.append("Agent/Reasoning/Safety (+3)")
-
-    # 模型发布 / 技术说明 (+2)
-    model_signals = ["introducing", "release", "launch", "new model", "gpt-", "claude", "o3", "o4"]
-    if any(s in title_lower for s in model_signals):
-        score += 2
-        reasons.append("模型发布/技术说明 (+2)")
 
     # === 正分：关键词匹配 ===
     keywords = load_keywords()
@@ -141,7 +180,8 @@ def main():
             art.get("title", ""),
             art.get("description", ""),
             art.get("url", ""),
-            art.get("source", "")
+            art.get("source", ""),
+            art.get("pub_date", "")
         )
         results.append({
             "title": art.get("title", ""),
@@ -155,7 +195,20 @@ def main():
 
     # 按分数排序
     results.sort(key=lambda x: x["score"], reverse=True)
-    print(json.dumps(results, indent=2, ensure_ascii=False))
+
+    # 硬性时间窗口：超过 MAX_AGE_DAYS 天的直接过滤
+    MAX_AGE_DAYS = 14
+    filtered = []
+    for r in results:
+        age_str = [x for x in r["reasons"] if "天前" in x]
+        if age_str:
+            import re
+            m = re.search(r'(\d+)天前', age_str[0])
+            if m and int(m.group(1)) > MAX_AGE_DAYS:
+                continue  # 跳过超龄文章
+        filtered.append(r)
+
+    print(json.dumps(filtered, indent=2, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()
