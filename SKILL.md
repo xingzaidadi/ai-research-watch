@@ -192,31 +192,58 @@ Callout 颜色语义（必须一致）：
 - 🟡 黄色：关联章节
 - 🟢 绿色：最佳实践
 
-#### 铁律二：文档所有权授予用户
+#### 铁律二：文档所有权授予用户（⚠️ 关键铁律，违反=用户打不开）
 
 所有用 `feishu_lark_cli docs +create` 创建的文档，**必须确保用户拥有 full_access 权限**。
-- 优先使用 `--as user` 创建（用户身份直接有文件夹权限）
-- 如果用 `--as bot`，CLI 会自动尝试授权；自动授权失败时，手动调用 `feishu_lark_cli drive +permission` 授权
-- **降级策略**：`--as bot` 报 `Permission denied` → 自动切换 `--as user` 重试
-- 用户 open_id：`ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef`
+
+**身份选择规则（严格遵守）：**
+
+| 场景 | 正确做法 | ❌ 错误做法 |
+|------|---------|------------|
+| 主会话（飞书 DM 触发） | `--as user`（用户 OAuth 可用） | 用 `--as bot` |
+| 子任务/子 Agent（sessions_spawn） | `--as user`（仍可用，see below） | 用 `--as bot` |
+| 定时任务（cron） | `--as bot` + 手动授权 | `--as bot` + 不授权 |
+
+**⚠️ 子 Agent 身份限制（2026-07-05 实测确认）：**
+- 子 Agent 中 `--as user` **可能失败**（报 `用户身份不可用：缺少 senderOpenId`）
+- 如果 `--as user` 失败，**必须先用 `--as bot` 创建文档，然后立即手动授权用户**：
+  ```
+  feishu_lark_cli drive +permission --token <doc_token> --type docx --member --member-id ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef --perm full_access
+  ```
+- **禁止跳过授权步骤**：`--as bot` 创建后，CLI 自动授权会因 `no current CLI user open_id` 被 skip，必须手动补授权
+
+**降级策略（按顺序尝试）：**
+1. 先尝试 `--as user` + `--parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe`（最佳：用户身份直接有文件夹权限）
+2. 若报 `用户身份不可用`，改用 `--as bot` + `--parent-token` + 立即 `drive +permission` 授权
+3. 若 `drive +permission` 也失败（bot 无文件夹权限），创建后**必须在报告中提醒用户手动授权**
+
+用户 open_id：`ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef`
 
 #### 铁律三：保存到指定文件夹
 
 所有文档必须保存到用户指定的论文库文件夹：
 - **目标文件夹 token**：`HkPgfPqEhl9Qbpdr4FCcfnTjnxe`
-- **创建命令**：`feishu_lark_cli docs +create --api-version v2 --as user --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe --content '...'`
-- **权限降级**：如果 `--as user` 不可用（如用户 OAuth 过期），改用 `--as bot` + 自动授权
-- 创建后自动获得 full_access 权限
+- **创建命令（优先）**：`feishu_lark_cli docs +create --api-version v2 --as user --parent-token HkPgfPqEhl9Qbpdr4FCcfnTjnxe --content '...'`
+- **⚠️ 禁止 `--as bot` + `--parent-token` 直接创建**：bot 对用户文件夹无写权限，会报 `destination parent no permission`
+- **降级方案**：如果无法用 `--as user`，先创建文档（不带 `--parent-token`），再授权用户，由用户手动移动到目标文件夹
 
 #### 文档命名
-- **arXiv 论文**：`{日期}_{论文标题}`
-- **博客文章**：`{日期}_{来源}_{文章标题}`
+- **arXiv 论文**：`{日期}_{中文标题}`
+- **博客文章**：`{日期}_{来源}_{中文标题}`
+- **⚠️ 日期铁律**：文档标题中的日期必须是**创建文档当天的日期**，不是论文下载日期。使用 `render_paper_doc.py --date $(date +%Y-%m-%d)` 覆盖 JSON 中的旧日期。
+- **⚠️ 语言铁律**：文档标题必须用**中文**，方便后期阅读和检索。英文论文标题需翻译为中文（保留专有名词如 CoRe、DPO 等）。
 
 #### 文档内容结构模板
 ```xml
 <title>{日期}_{标题}</title>
 <callout emoji="💡" background-color="orange"><b>一句话理解</b>：{核心结论}</callout>
 <p><i>来源：{来源链接} | 作者：{作者}</i></p>
+<hr/>
+<callout emoji="🧪" background-color="green"><b>30秒速懂</b>（给非专业人士的直觉解释）
+• <b>这东西在干嘛</b>：{用一句话大白话说明，禁止术语}
+• <b>打个比方</b>：{一个生活化/工作中的类比，让读者秒懂}
+• <b>为什么重要</b>：{一句话说清价值，比如「让搜索结果更准」而不是「提升了 ranking metric」}
+</callout>
 <hr/>
 # 第一章、{章节标题}
 > 📌 {一句话锚定}
@@ -251,9 +278,21 @@ Callout 颜色语义（必须一致）：
 **博客文章（Anthropic/OpenAI/Google 等）：**
 ```xml
 <h1>📎 原文链接</h1>
-<p>📄 <a href="{original_url}">原文</a> | 💻 <a href="{related_github}">相关代码/ Cookbook</a></p>
+<p>📄 <a href="{original_url}">原文</a> | 📥 <a href="{pdf_url}">PDF 离线版</a> | 💻 <a href="{related_github}">相关代码/ Cookbook</a></p>
 ```
-- 原文必放，相关代码/ Cookbook 有就放，没有就不放
+- 原文必放，PDF 离线版必生成（用 `scripts/html2pdf.py`），相关代码/ Cookbook 有就放，没有就不放
+- PDF 上传到飞书云空间，链接填入文档
+
+### PDF 生成（所有文章类型通用）
+
+```bash
+# 将文章内容转为 PDF
+python3 scripts/html2pdf.py /tmp/papers/article.txt /tmp/papers/article.pdf --title "中文标题"
+```
+
+- arXiv 论文：`fetch_paper.py` 已自动下载 PDF（`{ID}.pdf`），直接上传
+- 博客文章：用 `html2pdf.py` 从抓取的文本内容生成 PDF
+- 生成后上传到飞书云空间，将下载链接填入文档的「📎 下载链接」章节
 
 **判断逻辑：**
 - URL 含 `arxiv.org` → arXiv 论文格式
@@ -266,9 +305,12 @@ Callout 颜色语义（必须一致）：
 0. **检查工具链**：`ls scripts/` → 确认 `fetch_paper.py` 和 `render_paper_doc.py` 存在
 1. **下载论文**：`python3 scripts/fetch_paper.py <ID> -o /tmp/papers` → 自动三路 fallback
 2. **获取元数据**：从 `{ID}.result.json` 读取 title/authors/abstract
-3. **生成文档内容**：构造 JSON → `python3 scripts/render_paper_doc.py -i data.json -o doc.xml`
+3. **翻译标题**：将英文标题翻译为中文（保留 CoRe、DPO 等专有名词），用于文档命名
+4. **生成文档内容**：构造 JSON（必须包含 `quick_explain` 字段：what=大白话、analogy=类比、why_matters=价值）→ `python3 scripts/render_paper_doc.py -i data.json --date $(date +%Y-%m-%d) -o doc.xml`
 4. **创建飞书文档**：用 `feishu_lark_cli` 逐章串行追加到指定文件夹（见铁律四~七）
-5. **推送通知**：告知用户文档已创建，附飞书链接
+5. **生成 PDF**：用 `html2pdf.py` 生成离线 PDF 文件
+6. **上传 PDF**：上传到飞书云空间，获取下载链接
+7. **推送通知**：告知用户文档已创建，附飞书链接 + PDF 下载链接
 
 ### 脚本
 
@@ -276,6 +318,7 @@ Callout 颜色语义（必须一致）：
 |------|------|
 | `scripts/fetch_paper.py` | arXiv 论文下载（三路 fallback） |
 | `scripts/render_paper_doc.py` | JSON → 飞书 DocxXML（按 writing-guidelines 模板渲染） |
+| `scripts/html2pdf.py` | 文章文本/Markdown → PDF 离线版 |
 
 #### render_paper_doc.py 用法
 
@@ -287,7 +330,9 @@ python3 scripts/render_paper_doc.py -i paper_data.json -o doc.xml
 python3 scripts/render_paper_doc.py -i paper_data.json --validate
 ```
 
-JSON 输入格式见脚本内 docstring，核心字段：`title`, `arxiv_id`, `authors`, `source_url`, `one_liner`, `sections[]`。每个 section 包含 `title`, `anchor`, `why`, `core`, `pitfalls[]`, `related[]`, `remember`, `interview_qa[]`。
+JSON 输入格式见脚本内 docstring，核心字段：`title`, `arxiv_id`, `authors`, `source_url`, `one_liner`, `quick_explain{what,analogy,why_matters}`, `sections[]`。每个 section 包含 `title`, `anchor`, `why`, `core`, `pitfalls[]`, `related[]`, `remember`, `interview_qa[]`。
+
+**`quick_explain` 字段要求（铁律）**：必须用大白话写，禁止出现任何术语。读者应该是「完全不了解这个领域的人」。
 
 ### 输出文件（本地临时）
 
@@ -328,3 +373,20 @@ JSON 输入格式见脚本内 docstring，核心字段：`title`, `arxiv_id`, `a
 - 文档刚创建，只有骨架需要重写
 - 用户明确要求重写
 - 不要在有内容的文档上 overwrite
+
+#### 铁律八：PDF 生成必须验证中文（⚠️ 2026-07-13 新增）
+
+`html2pdf.py` 使用 PyMuPDF 内置 `china-s` 字体渲染中文。生成 PDF 后**必须验证**：
+```bash
+python3 -c "import fitz; doc=fitz.open('output.pdf'); text=doc[0].get_text(); assert '?' not in text[:100], '中文变问号了！'; print('✅ 验证通过')"
+```
+- 如果出现问号，说明字体渲染失败，禁止上传
+- ⛔ 禁止使用 `helv`/`courier` 等纯英文字体渲染中文内容
+
+#### 铁律九：禁止自行新增脚本替代现有工具链
+
+遇到工具缺失时：
+1. **先报告用户**，说明缺少什么工具、需要什么功能
+2. 用户确认后才可新增脚本
+3. 新增脚本必须经过完整测试（含中文、边界情况）
+4. ⛔ 禁止「自己判断该怎么做」然后悄悄实现——这是 Agent 可靠性的大敌
