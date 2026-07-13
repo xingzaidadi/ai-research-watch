@@ -6,7 +6,24 @@ AI Research Watch - 摘要渲染器
 """
 import json
 import sys
+import re
 from datetime import datetime
+
+
+def format_pub_date(raw):
+    """格式化发布日期为 YYYY-MM-DD"""
+    if not raw:
+        return ""
+    # 清理时区后缀
+    clean = re.sub(r'\s+(GMT|UTC|[+-]\d{4})$', '', raw.strip())
+    for fmt in ["%a, %d %b %Y %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"]:
+        try:
+            dt = datetime.strptime(clean[:len(fmt)+5], fmt)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return raw[:10] if len(raw) >= 10 else raw
+
 
 def render_stars(score):
     """分数转星级（1-5）"""
@@ -16,7 +33,7 @@ def render_stars(score):
     if score >= 2: return "★★☆☆☆"
     return "★☆☆☆☆"
 
-def render_digest(articles, max_new=3, max_evergreen=1):
+def render_digest(articles, max_new=5, max_evergreen=1):
     """
     生成推送文本
     articles: 已按 score 降序排列的列表
@@ -32,6 +49,9 @@ def render_digest(articles, max_new=3, max_evergreen=1):
         for i, art in enumerate(new_articles, 1):
             stars = render_stars(art.get("score", 0))
             lines.append(f"{i}. {art['title']}")
+            pub = format_pub_date(art.get('pub_date', ''))
+            if pub:
+                lines.append(f"📅 发布日期：{pub}")
             lines.append(f"📎 来源：{art.get('source', 'Unknown')}")
             lines.append(f"📂 类型：{art.get('type', 'Other')}")
             lines.append(f"⭐ 重要程度：{stars}")
@@ -55,16 +75,32 @@ def render_digest(articles, max_new=3, max_evergreen=1):
             lines.append("━━━━━━━━━━━━━━━━━━")
             lines.append("")
 
-    # 补课文章
+    # 补课文章（用和新文章一样的完整格式）
     if evergreen:
         lines.append("📚 今日补课：")
-        for art in evergreen:
-            lines.append(f"• {art['title']}（{art.get('source', '')}）")
-            lines.append(f"  🔗 {art['url']}")
+        lines.append("")
+        for i, art in enumerate(evergreen, 1):
+            lines.append(f"{i}. {art['title']}")
+            pub = format_pub_date(art.get('pub_date', ''))
+            if pub:
+                lines.append(f"📅 发布日期：{pub}")
+            lines.append(f"📎 来源：{art.get('source', 'Unknown')}")
+            lines.append(f"🔗 链接：{art['url']}")
+            lines.append("")
+            lines.append("💡 三句话总结：")
             summary = art.get("summary", "")
             if summary:
-                lines.append(f"  💡 {summary[:150]}")
-        lines.append("")
+                for line in summary.split("\n"):
+                    lines.append(f"• {line.strip()}")
+            else:
+                lines.append(f"• {art.get('description', '暂无摘要')[:100]}")
+            lines.append("")
+            tags = art.get("tags", [])
+            if tags:
+                lines.append(f"🎯 你需要关注：{'、'.join(tags)}")
+            lines.append("")
+            lines.append("━━━━━━━━━━━━━━━━━━")
+            lines.append("")
 
     if not new_articles and not evergreen:
         lines.append("今日无新内容，明天见 👋")
@@ -80,7 +116,7 @@ def main():
         data = json.load(sys.stdin)
 
     articles = data if isinstance(data, list) else data.get("articles", [])
-    max_new = data.get("max_new", 3) if isinstance(data, dict) else 3
+    max_new = data.get("max_new", 5) if isinstance(data, dict) else 5
 
     output = render_digest(articles, max_new=max_new)
     print(output)
