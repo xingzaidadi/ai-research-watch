@@ -132,6 +132,99 @@ flowchart TD
 
 ---
 
+## 本地 Markdown 导出（强制步骤）
+
+每次完成飞书文档创建后，**必须自动执行**以下流程，将所有已创建的文档导出为 Markdown 并发送压缩包给用户，供用户下载到本地桌面。
+
+### 为什么需要这一步
+用户需要在本地阅读/标注/备份文章，飞书在线阅读不够方便。导出为 Markdown 压缩包后，用户直接下载到桌面解压即可。
+
+### 工具链
+- `feishu_lark_cli docs +fetch --api-version v2 --as user --doc <token> --scope full`：获取文档 DocxXML 内容
+- `scripts/convert_xml_to_md.py`：DocxXML → Markdown 转换脚本
+- `tar czf`：打包压缩
+- `feishu_lark_cli im +messages-send --user-id ou_xxx --file xxx.tar.gz`：发送压缩包给用户
+
+### 执行步骤（每次下载论文后自动执行）
+
+1. **收集文档 token**：从本次创建的所有飞书文档中收集 document_id（包括之前已创建但本次未更新的文档）
+2. **批量 fetch + 转换**：对每个文档 token 执行 `docs +fetch`，将返回的 content 字段传入 `convert_xml_to_md.py` 转换为 Markdown
+   - 可并行 fetch 多个文档（每次最多5个并行调用以避免限流）
+   - 输出文件命名：`{日期}_{简称}.md`（如 `07-14_Building_Agents.md`）
+3. **打包**：`tar czf papers-export.tar.gz papers-export/*.md`
+4. **发送给用户**：
+   ```bash
+   feishu_lark_cli im +messages-send --user-id ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef --file papers-export.tar.gz
+   ```
+5. **推送解压说明**：告知用户文件已发送，附解压命令 `tar xzf papers-export.tar.gz`
+
+### convert_xml_to_md.py 转换规则
+- `<title>` → `# 标题`
+- `<h1>/<h2>/<h3>` → `# / ## / ###`
+- `<b>/<strong>` → `**加粗**`
+- `<i>/<em>` → `*斜体*`
+- `<a href="url">text</a>` → `[text](url)`
+- `<code>` → `` `代码` ``
+- `<callout>` → `> blockquote`
+- `<blockquote>` → `> blockquote`
+- `<table>` → Markdown 表格
+- `<hr/>` → `---`
+- 清除所有剩余 HTML 标签
+
+### 错误处理
+- fetch 失败（429 限流）：自动重试，最多3次，每次间隔5秒
+- fetch 失败（权限问题）：跳过该文档，在最终报告中标注
+- 转换失败：保留原始 XML 内容，在最终报告中标注
+
+---
+
+## PDF 批量下载（强制步骤）
+
+每次完成飞书文档创建后，**必须自动执行**以下流程，将论文库文件夹中所有 PDF 下载到本地并打包发送给用户。
+
+### 为什么需要这一步
+用户需要在本地阅读/标注 PDF 文件。通过 `drive +download` 接口批量下载后打包发送，用户直接下载到桌面解压即可。
+
+### 工具链
+- `feishu_lark_cli drive files list --params '{"folder_token":"HkPgfPqEhl9Qbpdr4FCcfnTjnxe"}' --as user`：列出文件夹下所有文件
+- `feishu_lark_cli drive +download --file-token <token> --as user --output <filename>`：下载单个 PDF（注意：`--output` 只接受相对路径）
+- `tar czf`：打包压缩
+- `feishu_lark_cli im +messages-send --user-id ou_xxx --file xxx.tar.gz`：发送压缩包给用户
+
+### 执行步骤（每次下载论文后自动执行）
+
+1. **列出文件夹内容**：
+   ```bash
+   feishu_lark_cli drive files list --params '{"folder_token":"HkPgfPqEhl9Qbpdr4FCcfnTjnxe","page_size":"200"}' --as user
+   ```
+2. **筛选 PDF 文件**：从返回结果中筛选 `type: "file"` 且 `name` 以 `.pdf` 结尾的文件
+3. **批量下载 PDF**：
+   - 先创建临时目录：`mkdir -p pdfs`
+   - 对每个 PDF 文件执行下载：
+     ```bash
+     feishu_lark_cli drive +download --file-token <token> --as user --output <filename>.pdf --overwrite
+     ```
+   - ⚠️ `--output` 必须用**相对路径**（相对于当前工作目录），不能用绝对路径
+   - ⚠️ 文件名中避免特殊字符，用英文命名（如 `1_Building_Agents.pdf`）
+4. **打包**：`tar czf all-papers.tar.gz pdfs/*.pdf`
+5. **发送给用户**：
+   ```bash
+   feishu_lark_cli im +messages-send --user-id ou_0f523a90cdfbb1cc84ccf67ba3fcf7ef --file all-papers.tar.gz
+   ```
+6. **推送解压说明**：告知用户文件已发送，附文件列表和解压命令
+
+### 两种压缩包一起发
+Markdown 压缩包和 PDF 压缩包可以一起发给用户（两个独立文件），或者合并为一个压缩包。
+- 建议分开打包：`papers-export.tar.gz`（Markdown）+ `all-papers.tar.gz`（PDF）
+- 分两次发送，避免单个文件过大
+
+### 错误处理
+- 下载失败：跳过该文件，在最终报告中标注失败的文件名
+- 文件夹为空：跳过 PDF 下载步骤，仅发送 Markdown 压缩包
+- 网络超时：自动重试，最多3次
+
+---
+
 ## 论文全文抓取（深度阅读模式）
 
 ### 触发条件
@@ -302,15 +395,17 @@ python3 scripts/html2pdf.py /tmp/papers/article.txt /tmp/papers/article.pdf --ti
 
 > ⚠️ **第 0 步（强制）**：收到下载请求后，必须先执行 `ls scripts/` 确认可用脚本，再按以下步骤操作。禁止凭记忆手动 curl/python 提取。下载必须用 `fetch_paper.py`，生成文档内容必须用 `render_paper_doc.py`。如脚本缺失，先报告用户再手动补全。
 
-0. **检查工具链**：`ls scripts/` → 确认 `fetch_paper.py` 和 `render_paper_doc.py` 存在
+0. **检查工具链**：`ls scripts/` → 确认 `fetch_paper.py`、`render_paper_doc.py`、`html2pdf.py`、`scripts/convert_xml_to_md.py` 存在
 1. **下载论文**：`python3 scripts/fetch_paper.py <ID> -o /tmp/papers` → 自动三路 fallback
 2. **获取元数据**：从 `{ID}.result.json` 读取 title/authors/abstract
 3. **翻译标题**：将英文标题翻译为中文（保留 CoRe、DPO 等专有名词），用于文档命名
 4. **生成文档内容**：构造 JSON（必须包含 `quick_explain` 字段：what=大白话、analogy=类比、why_matters=价值）→ `python3 scripts/render_paper_doc.py -i data.json --date $(date +%Y-%m-%d) -o doc.xml`
-4. **创建飞书文档**：用 `feishu_lark_cli` 逐章串行追加到指定文件夹（见铁律四~七）
-5. **生成 PDF**：用 `html2pdf.py` 生成离线 PDF 文件
-6. **上传 PDF**：上传到飞书云空间，获取下载链接
-7. **推送通知**：告知用户文档已创建，附飞书链接 + PDF 下载链接
+5. **创建飞书文档**：用 `feishu_lark_cli` 逐章串行追加到指定文件夹（见铁律四~七）
+6. **生成 PDF**：用 `html2pdf.py` 生成离线 PDF 文件
+7. **上传 PDF**：上传到飞书云空间，获取下载链接
+8. **下载 PDF 到本地**（强制步骤，见下方「PDF 批量下载」章节）：批量下载论文库文件夹中所有 PDF，打包发送给用户
+9. **导出 Markdown 压缩包发飞书**（强制步骤，见下方「本地 Markdown 导出」章节）：批量 fetch 文档内容转 Markdown，打包发送给用户
+10. **推送通知**：告知用户文档已创建 + 两个压缩包已发送，附飞书链接 + 解压命令
 
 ### 脚本
 
@@ -319,6 +414,7 @@ python3 scripts/html2pdf.py /tmp/papers/article.txt /tmp/papers/article.pdf --ti
 | `scripts/fetch_paper.py` | arXiv 论文下载（三路 fallback） |
 | `scripts/render_paper_doc.py` | JSON → 飞书 DocxXML（按 writing-guidelines 模板渲染） |
 | `scripts/html2pdf.py` | 文章文本/Markdown → PDF 离线版 |
+| `scripts/convert_xml_to_md.py` | 飞书 DocxXML → Markdown 转换 |
 
 #### render_paper_doc.py 用法
 
