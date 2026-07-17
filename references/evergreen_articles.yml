@@ -1,83 +1,94 @@
-# Evergreen 补课文章池
-# 当天无新内容时，从这里选文章推送
+# Evergreen 补课文章池（2026-07-17 重建）
+# 规则：仅收录 14 天内的高价值文章，每次补课最多选 2 篇
+# 每篇文章 max_pushes=2，超过不再推送
 
 evergreen:
-  - title: "Demystifying evals for AI agents"
-    source: Anthropic
-    url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents"
-    category: eval
-    tags: [eval, benchmark, agent, grading]
+  - title: "GPT-Red：通过自我改进实现鲁棒性"
+    source: OpenAI
+    url: "https://openai.com/index/unlocking-self-improvement-gpt-red"
+    pub_date: "2026-07-15"
+    category: safety
+    tags: [safety, red-team, self-play, alignment]
     max_pushes: 2
-    push_count: 0
+    push_count: 1
+
+  - title: "编码评估中的信号与噪声分离"
+    source: OpenAI
+    url: "https://openai.com/index/separating-signal-from-noise-coding-evaluations"
+    pub_date: "2026-07-08"
+    category: eval
+    tags: [eval, benchmark, swe-bench, methodology]
+    max_pushes: 2
+    push_count: 1
+
+  - title: "驾驭工程：在 Agent 优先的世界中用好 Codex"
+    source: OpenAI
+    url: "https://openai.com/index/harness-engineering/"
+    pub_date: "2026-06-25"
+    category: engineering
+    tags: [codex, harness, engineering, agent]
+    max_pushes: 2
+    push_count: 1
 
   - title: "Building effective agents"
     source: Anthropic
     url: "https://www.anthropic.com/engineering/building-effective-agents"
+    pub_date: "2026-07-03"
     category: agent
     tags: [agent, workflow, orchestration]
     max_pushes: 2
-    push_count: 0
+    push_count: 1
 
-  - title: "A practical guide to building agents"
-    source: OpenAI
-    url: "https://openai.com/index/a-practical-guide-to-building-agents/"
-    category: agent
-    tags: [agent, orchestration, handoff]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "LLM Powered Autonomous Agents"
-    source: Lilian Weng (OpenAI)
-    url: "https://lilianweng.github.io/posts/2023-06-23-agent/"
-    category: foundational
-    tags: [agent, memory, planning, tools]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "Harness engineering: leveraging Codex in an agent-first world"
-    source: OpenAI
-    url: "https://openai.com/index/harness-engineering/"
+  - title: "Demystifying evals for AI agents"
+    source: Anthropic
+    url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents"
+    pub_date: "2026-07-03"
     category: eval
-    tags: [eval, codex, harness, engineering]
+    tags: [eval, benchmark, agent, grading]
     max_pushes: 2
-    push_count: 0
+    push_count: 1
 
-  - title: "Establishing Best Practices for Building Rigorous Agentic Benchmarks"
-    source: arXiv
-    url: "https://arxiv.org/abs/2505.00149"
-    category: benchmark
-    tags: [benchmark, evaluation, methodology]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "Log analysis is necessary for credible evaluation of AI agents"
-    source: arXiv
-    url: "https://arxiv.org/abs/2505.00150"
-    category: eval
-    tags: [eval, logging, credibility, transcript]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "The 2025 AI Agent Index"
-    source: arXiv
-    url: "https://arxiv.org/abs/2602.16151"
-    category: survey
-    tags: [agent, survey, landscape]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "Improving Deep Agents with Harness Engineering"
-    source: LangChain
-    url: "https://blog.langchain.dev/improving-deep-agents-with-harness-engineering/"
-    category: agent
-    tags: [agent, harness, self-improvement, langchain]
-    max_pushes: 2
-    push_count: 0
-
-  - title: "Practices for governing agentic AI systems"
+  - title: "Deep Research System Card"
     source: OpenAI
-    url: "https://openai.com/index/practices-for-governing-agentic-ai-systems/"
-    category: governance
-    tags: [governance, safety, alignment, policy]
+    url: "https://openai.com/index/deep-research-system-card"
+    pub_date: "2026-07-06"
+    category: safety
+    tags: [safety, system-card, deep-research]
     max_pushes: 2
-    push_count: 0
+    push_count: 1
+
+  - title: "GPT-5.6 发布：随野心扩展的前沿智能"
+    source: OpenAI
+    url: "https://openai.com/index/gpt-5-6"
+    pub_date: "2026-07-09"
+    category: model-release
+    tags: [model, release, gpt-5]
+    max_pushes: 2
+    push_count: 1
+
+  - title: "Core Dump 流行病学：修复一个18年历史的 Bug"
+    source: OpenAI
+    url: "https://openai.com/index/core-dump-epidemiology-data-infrastructure-bug"
+    pub_date: "2026-07-11"
+    category: engineering
+    tags: [engineering, debugging, infrastructure]
+    max_pushes: 2
+    push_count: 1
+
+  - title: "如何在 Agent 时代管理 AI 投资"
+    source: OpenAI
+    url: "https://openai.com/index/managing-ai-investments-in-agentic-era"
+    pub_date: "2026-07-14"
+    category: strategy
+    tags: [agent, roi, investment, management]
+    max_pushes: 2
+    push_count: 1
+
+  - title: "A global workspace in language models"
+    source: Anthropic
+    url: "https://www.anthropic.com/research/global-workspace"
+    pub_date: "2026-07-07"
+    category: research
+    tags: [research, interpretability, workspace]
+    max_pushes: 2
+    push_count: 1

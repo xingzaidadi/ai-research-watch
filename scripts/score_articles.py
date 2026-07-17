@@ -42,10 +42,7 @@ def score_article(title, description, url, source_name, pub_date=None):
     now = datetime.utcnow()
     if pub_date:
         try:
-            # 清理日期字符串（去掉时区后缀如 GMT/UTC）
-            import re
             clean_date = re.sub(r'\s+(GMT|UTC|[+-]\d{4})$', '', pub_date.strip())
-            # 尝试解析多种日期格式
             for fmt in ["%a, %d %b %Y %H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"]:
                 try:
                     pub_dt = datetime.strptime(clean_date[:len(fmt)+5], fmt)
@@ -77,34 +74,44 @@ def score_article(title, description, url, source_name, pub_date=None):
 
     # === 正分：来源类型 ===
     title_lower = (title + " " + description).lower()
+    url_lower = url.lower()
 
-    # 模型发布 / 重大产品更新 (+6) — 提升权重！
-    model_signals = ["introducing", "release", "launch", "new model", "gpt-", "claude", "o3", "o4"]
-    if any(s in title_lower for s in model_signals):
-        score += 6
-        reasons.append("模型发布/重大更新 (+6)")
-
-    # 官方研究 / Publication (+5)
-    research_signals = ["research", "paper", "study", "arxiv", "publication"]
-    if any(s in url.lower() for s in ["/research/", "/papers/", "arxiv.org"]):
-        score += 5
-        reasons.append("官方Research/论文 (+5)")
+    # 官方 Research / 论文 (+8) — 最高优先级！
+    research_signals = ["research", "paper", "study", "arxiv", "publication",
+                        "swe-bench", "benchmark", "eval", "evaluation"]
+    if any(s in url_lower for s in ["/research/", "/papers/", "arxiv.org"]):
+        score += 8
+        reasons.append("官方Research/论文 (+8)")
     elif any(s in title_lower for s in research_signals):
-        score += 5
-        reasons.append("研究类内容 (+5)")
+        score += 8
+        reasons.append("研究/评估类内容 (+8)")
 
-    # Benchmark / System Card / Eval (+4)
+    # 模型发布 / 重大产品更新 (+7)
+    model_signals = ["introducing", "release", "launch", "new model", "gpt-",
+                     "claude", "o3", "o4", "frontier", "preferred model"]
+    if any(s in title_lower for s in model_signals):
+        score += 7
+        reasons.append("模型发布/重大更新 (+7)")
+
+    # Benchmark / System Card / Eval (+6)
     bench_signals = ["benchmark", "system card", "eval", "evaluation", "assessment"]
     if any(s in title_lower for s in bench_signals):
-        score += 4
-        reasons.append("Benchmark/Eval/System Card (+4)")
+        score += 6
+        reasons.append("Benchmark/Eval/System Card (+6)")
 
-    # Agent / Reasoning / Alignment / Safety (+3)
+    # Agent / Reasoning / Alignment / Safety (+5)
     agent_signals = ["agent", "reasoning", "alignment", "safety", "chain of thought",
-                     "tool use", "planning", "reflection", "autonomy"]
+                     "tool use", "function calling", "planning", "reflection", "autonomy"]
     if any(s in title_lower for s in agent_signals):
-        score += 3
-        reasons.append("Agent/Reasoning/Safety (+3)")
+        score += 5
+        reasons.append("Agent/Reasoning/Safety (+5)")
+
+    # 产品能力更新 (+4) — 如 Copilot、Voice、Work 等
+    product_signals = ["copilot", "voice", "work", "coding", "cowork", "live",
+                       "introducing gpt", "now the preferred"]
+    if any(s in title_lower for s in product_signals):
+        score += 4
+        reasons.append("产品能力更新 (+4)")
 
     # === 正分：关键词匹配 ===
     keywords = load_keywords()
@@ -122,28 +129,29 @@ def score_article(title, description, url, source_name, pub_date=None):
             reasons.append(f"关键词匹配 [{kw}] (+1)")
 
     # === 负分：噪音过滤 ===
-    # 纯营销 / 招聘 / 合作新闻稿 (-3)
+    # 纯营销 / 招聘 / 客户案例 (-4)
     spam_signals = ["hiring", "job opening", "career", "partnership announcement",
-                    "press release", "we're hiring", "join our team"]
-    if any(s in title_lower for s in spam_signals):
-        score -= 3
-        reasons.append("营销/招聘/合作 (-3)")
+                    "press release", "we're hiring", "join our team",
+                    "how .* is", "aims to become", "moves faster with"]
+    if any(re.search(s, title_lower) for s in spam_signals):
+        score -= 4
+        reasons.append("营销/招聘/客户案例 (-4)")
 
     # 非官方二手转述 (-5)
     secondary_signals = ["says", "according to", "reportedly", "analysis of",
                          "reaction to", "what we learned from"]
     if any(s in title_lower for s in secondary_signals):
-        # 但如果来自官方源则不扣分
         official_domains = ["openai.com", "anthropic.com", "arxiv.org", "huggingface.co"]
-        if not any(d in url.lower() for d in official_domains):
+        if not any(d in url_lower for d in official_domains):
             score -= 5
             reasons.append("二手转述 (-5)")
 
-    # 非技术内容 (-2)
-    non_tech = ["office", "expansion", "funding", "valuation", "ipo", "hire"]
+    # 非技术内容 (-3)
+    non_tech = ["office", "expansion", "funding", "valuation", "ipo", "hire",
+                "national security", "government"]
     if any(s in title_lower for s in non_tech):
-        score -= 2
-        reasons.append("非技术内容 (-2)")
+        score -= 3
+        reasons.append("非技术内容 (-3)")
 
     return score, reasons
 
@@ -164,6 +172,38 @@ def classify_article(title, description):
         return "Engineering"
     return "Other"
 
+def enrich_pub_date_from_rss(articles):
+    """从 RSS 源回填缺失的 pub_date（RSS 有 pubDate，页面抓取没有）"""
+    import xml.etree.ElementTree as ET
+    from urllib.request import urlopen, Request
+
+    rss_urls = [
+        "https://openai.com/news/rss.xml",
+        "https://www.anthropic.com/rss.xml",
+    ]
+
+    url_to_date = {}
+    for rss_url in rss_urls:
+        try:
+            req = Request(rss_url, headers={"User-Agent": "AI-Research-Watch/1.0"})
+            with urlopen(req, timeout=15) as resp:
+                xml_data = resp.read().decode("utf-8")
+            root = ET.fromstring(xml_data)
+            for item in root.findall(".//item"):
+                link = item.findtext("link", "").strip()
+                pub = item.findtext("pubDate", "").strip()
+                if link and pub:
+                    url_to_date[link] = pub
+        except Exception:
+            pass
+
+    for art in articles:
+        if not art.get("pub_date") and art.get("url") in url_to_date:
+            art["pub_date"] = url_to_date[art["url"]]
+
+    return articles
+
+
 def main():
     """命令行入口：接收 JSON 输入，输出评分结果"""
     if len(sys.argv) > 1:
@@ -173,6 +213,9 @@ def main():
     else:
         # 从 stdin 读取
         articles = json.load(sys.stdin)
+
+    # 先从 RSS 回填缺失的 pub_date
+    articles = enrich_pub_date_from_rss(articles)
 
     results = []
     for art in articles:
@@ -187,6 +230,7 @@ def main():
             "title": art.get("title", ""),
             "url": art.get("url", ""),
             "source": art.get("source", ""),
+            "pub_date": art.get("pub_date", ""),
             "score": score,
             "reasons": reasons,
             "type": classify_article(art.get("title", ""), art.get("description", "")),
